@@ -112,10 +112,10 @@ class RemotiveV41(MovingCameraScene):
             examples: [3.15, -0.45, 0],
         }
 
-        self.play(FadeIn(center, scale=0.7), run_time=0.45)
+        self.play(Create(center[0]), FadeIn(center[1], scale=0.7), run_time=0.45)
         self.play(
             *[
-                mob.animate.move_to(pos).scale(0.92)
+                mob.animate.move_to(pos).scale(0.92).set_opacity(1)
                 for mob, pos in target_positions.items()
             ],
             run_time=1.15,
@@ -264,7 +264,7 @@ class RemotiveV41(MovingCameraScene):
         self.play(FadeIn(action), Create(result_links), run_time=0.85)
         self.play(
             FadeIn(action_lines, shift=UP * 0.3),
-            action.animate.scale(1.10),
+            action.animate.set_opacity(1).scale(1.10),
             run_time=0.75,
         )
 
@@ -287,7 +287,7 @@ class RemotiveV41(MovingCameraScene):
         # 24–30s — Pull back: one connected system, one causal story.
         # ------------------------------------------------------------------
         self.play(
-            self.camera.frame.animate.set_width(14.0).move_to([0, 0.2, 0]),
+            self.camera.frame.animate.set_width(10.5).move_to([0, 0.2, 0]),
             run_time=1.25,
         )
 
