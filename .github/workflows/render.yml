@@ -1,12 +1,10 @@
-name: Render MP4
+name: Visual Story Prototype
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - visual-engine-v9
-      - visual-asset-intelligence-v1
-      - main
+      - visual-story-prototype-v1
 
 jobs:
   render:
@@ -34,34 +32,30 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install piper-tts
 
-      - name: Retrieve and validate real visual assets
+      - name: Download curated visual assets
         run: |
-          python scripts/retrieve_assets.py
-          for f in public/assets/scene*.png; do
-            [ -e "$f" ] || continue
-            base="${f%.png}"
-            ffmpeg -y -loglevel error -i "$f" -q:v 2 "${base}.jpg"
-            rm "$f"
+          mkdir -p public/assets
+          curl -L --fail --retry 3 "https://upload.wikimedia.org/wikipedia/commons/9/93/Man_uses_laptop.jpg" -o public/assets/story-laptop.jpg
+          curl -L --fail --retry 3 "https://upload.wikimedia.org/wikipedia/commons/1/11/PDC_server_room.jpg" -o public/assets/story-servers.jpg
+          curl -L --fail --retry 3 "https://upload.wikimedia.org/wikipedia/commons/2/26/Computer_teacher.jpg" -o public/assets/story-teacher.jpg
+          curl -L --fail --retry 3 "https://upload.wikimedia.org/wikipedia/commons/e/ef/Programming_code.jpg" -o public/assets/story-code.jpg
+          for f in public/assets/story-*.jpg; do
+            test -s "$f"
+            file "$f"
           done
-          python - <<'PY'
-          import json, os
-          p='public/assets/manifest.json'
-          data=json.load(open(p))
-          for x in data:
-              x['render_path']=x['path'].rsplit('.',1)[0]+'.jpg'
-          json.dump(data,open(p,'w'),ensure_ascii=False,indent=2)
-          print(json.dumps(data,ensure_ascii=False,indent=2))
-          PY
 
-      - name: Generate natural US English voice
+      - name: Generate narration
         run: |
           mkdir -p public
           python -m piper.download_voices --data-dir public en_US-lessac-high
-          printf '%s\n' "Three things ChatGPT can do that most people don't know. The third one can save you hours." | python -m piper -m en_US-lessac-high --data-dir public -f scene1.wav --length_scale 0.86
-          printf '%s\n' "First: research. Give ChatGPT a messy question, your goal, and your constraints. It can compare options, spot gaps, and turn the research into a clear plan." | python -m piper -m en_US-lessac-high --data-dir public -f scene2.wav --length_scale 0.86
-          printf '%s\n' "Second: understand. Give it a difficult idea. Then ask it to teach that idea at your level, with examples and simpler language." | python -m piper -m en_US-lessac-high --data-dir public -f scene3.wav --length_scale 0.86
-          printf '%s\n' "Third: build. Give it a rough outcome, and it can turn that idea into code, scripts, checklists, or a first draft. Start with the result, not the tool." | python -m piper -m en_US-lessac-high --data-dir public -f scene4.wav --length_scale 0.86
-          ffmpeg -y -i scene1.wav -i scene2.wav -i scene3.wav -i scene4.wav -filter_complex "[0:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:5.50[a0];[1:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:9.25[a1];[2:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:6.50[a2];[3:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:8.75[a3];[a0][a1][a2][a3]concat=n=4:v=0:a=1,atrim=0:30[a]" -map "[a]" -ar 22050 -ac 1 public/voice.wav
+          printf '%s\n' "You type a question. It looks simple, but your request has to travel through a much bigger system." | python -m piper -m en_US-lessac-high --data-dir public -f s1.wav --length_scale 0.86
+          printf '%s\n' "Servers receive it, process it, and move information between thousands of machines before anything comes back." | python -m piper -m en_US-lessac-high --data-dir public -f s2.wav --length_scale 0.86
+          printf '%s\n' "But information alone is not enough. The viewer needs a path from the idea to the meaning." | python -m piper -m en_US-lessac-high --data-dir public -f s3.wav --length_scale 0.86
+          printf '%s\n' "That is what good visual storytelling does. It makes the idea visible, and the result understandable." | python -m piper -m en_US-lessac-high --data-dir public -f s4.wav --length_scale 0.86
+          ffmpeg -y -i s1.wav -i s2.wav -i s3.wav -i s4.wav -filter_complex "[0:a]apad=pad_dur=0.15,atrim=0:6[a0];[1:a]apad=pad_dur=0.15,atrim=0:6[a1];[2:a]apad=pad_dur=0.15,atrim=0:6[a2];[3:a]apad=pad_dur=0.15,atrim=0:6[a3];[a0][a1][a2][a3]concat=n=4:v=0:a=1,atrim=0:24[a]" -map "[a]" -ar 22050 -ac 1 public/voice.wav
+
+      - name: Typecheck
+        run: npm run check
 
       - name: Render video
         run: npm run render
@@ -69,18 +63,14 @@ jobs:
       - name: Verify output
         run: |
           test -s out/main.mp4
-          test -s public/assets/scene01.jpg
-          test -s public/assets/scene02.jpg
-          test -s public/assets/scene03.jpg
-          test -s public/assets/scene04.jpg
+          ffprobe -v error -show_entries format=duration,size -of default=nw=1 out/main.mp4
           ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,codec_name -of default=nw=1 out/main.mp4
           ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate -of default=nw=1 out/main.mp4
 
-      - name: Upload MP4 and asset manifest
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: visual-asset-intelligence-v1
+          name: visual-story-prototype-v1
           path: |
             out/main.mp4
-            public/assets/manifest.json
-          if-no-files-found: error
+            public/assets/story-*.jpg
