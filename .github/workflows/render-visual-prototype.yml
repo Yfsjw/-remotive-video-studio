@@ -18,11 +18,24 @@ jobs:
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev pkg-config python3-dev
       - name: Install Manim
         run: python -m pip install --upgrade pip && python -m pip install manim
-      - name: Render Manim scene
+      - name: Render Manim source
         run: |
-          mkdir -p public/manim
+          mkdir -p public/manim diagnostics/manim
           manim -qh visual/scene_01.py Scene01 -o scene01.mp4
-          cp media/videos/scene_01/1920p30/scene01.mp4 public/manim/scene01.mp4
+          test -s media/videos/scene_01/1920p30/scene01.mp4
+          cp media/videos/scene_01/1920p30/scene01.mp4 diagnostics/manim/scene01-raw.mp4
+          ffprobe -v error -show_streams -show_format media/videos/scene_01/1920p30/scene01.mp4 > diagnostics/manim/raw-ffprobe.txt
+      - name: Normalize Manim video for browser playback
+        run: |
+          ffmpeg -y -i diagnostics/manim/scene01-raw.mp4             -an -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p             -movflags +faststart -r 30 -vf "scale=1080:1920:flags=lanczos,setsar=1"             public/manim/scene01.mp4
+          ffprobe -v error -show_streams -show_format public/manim/scene01.mp4 > diagnostics/manim/normalized-ffprobe.txt
+          ffmpeg -y -ss 2 -i public/manim/scene01.mp4 -frames:v 1 -update 1 diagnostics/manim/scene01-frame.png
+      - name: Upload Manim source diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: v8-manim-source-diagnostics
+          path: diagnostics/manim
+          if-no-files-found: error
       - name: Install Remotion
         run: npm install
       - name: Generate five-second US English voice
@@ -36,9 +49,17 @@ jobs:
         run: npm run check
       - name: Render final five-second MP4
         run: npm run render
-      - name: Upload final MP4
+      - name: Verify final MP4
+        run: |
+          test -s out/scene01.mp4
+          ffprobe -v error -show_streams -show_format out/scene01.mp4 > diagnostics/final-ffprobe.txt
+          ffmpeg -y -ss 2 -i out/scene01.mp4 -frames:v 1 -update 1 diagnostics/final-frame.png
+      - name: Upload final MP4 and diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: visual-engine-prototype-scene01
-          path: out/scene01.mp4
+          name: v8-final-scene01
+          path: |
+            out/scene01.mp4
+            diagnostics/final-ffprobe.txt
+            diagnostics/final-frame.png
           if-no-files-found: error
