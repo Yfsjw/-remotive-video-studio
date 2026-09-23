@@ -54,6 +54,7 @@ class RemotiveV4(Scene):
             run_time=1.3,
         )
         self.play(Create(target[0]), run_time=0.7)
+        self.wait(1.0)
 
         # 4–11s: transform the idea into a structured plan.
         plan_title = Text("STRUCTURE", font_size=48, color="#38BDF8", weight=BOLD)
@@ -95,6 +96,7 @@ class RemotiveV4(Scene):
         result = Text("NOW IT CAN ACT", font_size=54, color=WHITE, weight=BOLD)
         result.move_to([0, -3.35, 0])
         self.play(GrowArrow(arrow), FadeIn(result, shift=UP * 0.2), run_time=1.0)
+        self.wait(2.5)
 
         # 11–18s: camera-like reframing and transformation into output.
         frame_box = RoundedRectangle(
@@ -133,6 +135,7 @@ class RemotiveV4(Scene):
             ),
             run_time=2.4,
         )
+        self.wait(4.0)
 
         # 18–24s: transform plan into a concrete artifact.
         code_box = RoundedRectangle(
@@ -156,6 +159,7 @@ class RemotiveV4(Scene):
             FadeOut(check),
             run_time=1.4,
         )
+        self.wait(2.5)
 
         # 24–30s: pull back and reveal the whole pipeline.
         pipeline = VGroup(
@@ -186,4 +190,4 @@ class RemotiveV4(Scene):
             pipeline.animate.scale(1.08),
             run_time=0.8,
         )
-        self.wait(0.8)
+        self.wait(3.9)
