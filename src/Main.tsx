@@ -116,7 +116,7 @@ const BuildScene=({frame,opacity}:{frame:number;opacity:number})=>{
    </Glass>
    <Glass style={{width:330,borderRadius:26,padding:18,background:'linear-gradient(145deg,rgba(251,191,36,.10),rgba(255,255,255,.035))'}}><div style={{height:24,width:150,borderRadius:7,background:'rgba(255,255,255,.10)'}}/><div style={{marginTop:18,height:90,borderRadius:18,background:'linear-gradient(135deg,rgba(251,191,36,.35),rgba(167,139,250,.18))',border:'1px solid rgba(255,255,255,.12)'}}/><div style={{marginTop:16,width:'72%',height:10,borderRadius:5,background:'rgba(255,255,255,.16)'}}/><div style={{marginTop:10,width:'54%',height:10,borderRadius:5,background:'rgba(255,255,255,.09)'}}/><div style={{marginTop:18,width:110,height:34,borderRadius:12,background:'#FBBF24',display:'flex',alignItems:'center',justifyContent:'center',color:'#17130A',fontWeight:900,fontSize:13}}>WORKING DRAFT</div></Glass>
   </div></div>
-  <div style={{position:'absolute',right:56,bottom:125,opacity:result,fontSize:14,letterSpacing:2.5,opacity:result}}>IDEA → DRAFT → RESULT</div>
+  <div style={{position:'absolute',right:56,bottom:125,opacity:result,fontSize:14,letterSpacing:2.5}}>IDEA → DRAFT → RESULT</div>
  </div>;
 };
 
