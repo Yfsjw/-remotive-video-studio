@@ -146,9 +146,7 @@ class RemotiveV6(MovingCameraScene):
                 y = p[1] - .52 - j*.38
                 micro.add(self.line([p[0]-.85,y,0],[p[0]+.85,y,0],c,3,.65))
 
-        play(FadeOut(kicker), FadeOut(headline), FadeOut(tokens), FadeOut(orbit),
-             FadeOut(core), FadeOut(core_ring),
-             FadeIn(new_title, shift=DOWN*.2), FadeIn(center, scale=.8),
+        play(FadeIn(new_title, shift=DOWN*.2), FadeIn(center, scale=.8),
              Create(center_ring), run_time=.75)
 
         # Tokens physically fly toward their semantic destination.
@@ -216,9 +214,7 @@ class RemotiveV6(MovingCameraScene):
             self.t("clicks",20,self.C["amber"]),
         ).arrange(DOWN,aligned_edge=LEFT,buff=.28).move_to([2.65,-3.65,0])
 
-        play(FadeOut(new_title), FadeOut(center), FadeOut(center_ring), FadeOut(anchors),
-             FadeOut(anchor_lines), FadeOut(micro),
-             FadeIn(title,shift=DOWN*.2), FadeIn(request,scale=.9), Create(request_ring),
+        play(FadeIn(title,shift=DOWN*.2), FadeIn(request,scale=.9), Create(request_ring),
              Create(split), run_time=.8)
         play(FadeIn(left_label), FadeIn(right_label), Create(left_axis), Create(left_curve),
              FadeIn(left_points), FadeIn(left_words), FadeIn(phone), FadeIn(screen),
@@ -259,11 +255,7 @@ class RemotiveV6(MovingCameraScene):
         out = self.t("ONE CLEAR IDEA", 32, self.C["green"]).move_to([0,-2.0,0])
         out_ring = self.ring(1.0,self.C["green"],3).move_to(out)
 
-        play(FadeOut(title),FadeOut(request),FadeOut(request_ring),FadeOut(split),
-             FadeOut(left_label),FadeOut(right_label),FadeOut(left_axis),FadeOut(left_curve),
-             FadeOut(left_points),FadeOut(left_words),FadeOut(phone),FadeOut(screen),
-             FadeOut(play_head),FadeOut(right_words),FadeOut(pulse),
-             FadeIn(title2,shift=DOWN*.2),FadeIn(stream),Create(funnel_top),
+        play(FadeIn(title2,shift=DOWN*.2),FadeIn(stream),Create(funnel_top),
              FadeIn(inner),FadeIn(labels),run_time=.9)
 
         # Camera follows the stream into the narrow exit.
@@ -319,9 +311,7 @@ class RemotiveV6(MovingCameraScene):
         learned = self.t("STYLE  +  STRUCTURE  +  RHYTHM", 29, self.C["green"]).move_to([0,-2.25,0])
         learned_ring = self.ring(1.0,self.C["green"],2.5).move_to([0,-2.25,0])
 
-        play(FadeOut(title2),FadeOut(stream),FadeOut(funnel_top),FadeOut(inner),FadeOut(labels),
-             FadeOut(out),FadeOut(out_ring),
-             FadeIn(title3,shift=DOWN*.2),FadeIn(frameA),FadeIn(frameB),FadeIn(frameC),
+        play(FadeIn(title3,shift=DOWN*.2),FadeIn(frameA),FadeIn(frameB),FadeIn(frameC),
              Create(ax),Create(curveA),FadeIn(dotsA),FadeIn(blocksB),Create(baselineB),
              FadeIn(dotsC),Create(rhythmC),run_time=.9)
         play(Create(merge),FadeIn(learned,shift=UP*.2),Create(learned_ring),run_time=.7)
@@ -368,10 +358,7 @@ class RemotiveV6(MovingCameraScene):
             self.line([-1.6,-3.35,0],[1.6,-3.35,0],self.C["muted"],2,.5)
         )
 
-        play(FadeOut(title3),FadeOut(frameA),FadeOut(frameB),FadeOut(frameC),FadeOut(ax),
-             FadeOut(curveA),FadeOut(dotsA),FadeOut(blocksB),FadeOut(baselineB),
-             FadeOut(dotsC),FadeOut(rhythmC),FadeOut(merge),FadeOut(learned),FadeOut(learned_ring),
-             FadeIn(title4,shift=DOWN*.2),FadeIn(nucleus,scale=.85),Create(nucleus_ring),
+        play(FadeIn(title4,shift=DOWN*.2),FadeIn(nucleus,scale=.85),Create(nucleus_ring),
              Create(spokes),FadeIn(nodes),Create(node_rings),run_time=.9)
 
         # The system selects a path instead of lighting everything equally.
@@ -419,9 +406,7 @@ class RemotiveV6(MovingCameraScene):
         action_ring = self.ring(.95,self.C["green"],3).move_to(action)
         payoff = self.t("RESULT", 25, self.C["white"]).move_to([0,-4.25,0])
 
-        play(FadeOut(title4),FadeOut(nucleus),FadeOut(nucleus_ring),FadeOut(nodes),FadeOut(node_rings),
-             FadeOut(spokes),FadeOut(output_box),FadeOut(output),FadeOut(result_lines),
-             FadeIn(kicker2,shift=DOWN*.2),FadeIn(final,shift=UP*.2),
+        play(FadeIn(kicker2,shift=DOWN*.2),FadeIn(final,shift=UP*.2),
              FadeIn(idea,scale=.8),Create(idea_ring),run_time=.85)
 
         play(
