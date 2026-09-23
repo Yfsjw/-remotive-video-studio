@@ -120,6 +120,8 @@ class RemotiveV6(MovingCameraScene):
         # ================================================================
         # 3.4–7.5  TRANSFORMATION — semantic structure emerges from chaos.
         self.clear()
+        self.camera.frame.move_to([0,0,0])
+        self.camera.frame.set_width(10.5)
         # ================================================================
         new_title = self.t("Structure is the first transformation.", 36).set_width(8.8).to_edge(UP, buff=.55)
         center = self.t("PROMPT", 34, self.C["white"]).move_to([0, .5, 0])
@@ -169,6 +171,8 @@ class RemotiveV6(MovingCameraScene):
         # ================================================================
         # 7.5–12.0  CONTEXT — one request splits into two worlds.
         self.clear()
+        self.camera.frame.move_to([0,0,0])
+        self.camera.frame.set_width(10.5)
         # ================================================================
         title = self.t("Same words. Different world.", 38).set_width(8.8).to_edge(UP, buff=.55)
         request = self.t("LAUNCH POST", 34, self.C["white"]).move_to([0, 3.7, 0])
@@ -232,6 +236,8 @@ class RemotiveV6(MovingCameraScene):
         # ================================================================
         # 12.0–16.5  CONSTRAINTS — an infinite stream is physically narrowed.
         self.clear()
+        self.camera.frame.move_to([0,0,0])
+        self.camera.frame.set_width(10.5)
         # ================================================================
         title2 = self.t("Constraints turn infinity into a decision.", 35).set_width(8.8).to_edge(UP,buff=.55)
 
@@ -271,6 +277,8 @@ class RemotiveV6(MovingCameraScene):
         # ================================================================
         # 16.5–21.0  EXAMPLES — references become a learned visual rhythm.
         self.clear()
+        self.camera.frame.move_to([0,0,0])
+        self.camera.frame.set_width(10.5)
         # ================================================================
         title3 = self.t("Examples teach what words cannot.", 37).set_width(8.8).to_edge(UP,buff=.55)
 
@@ -330,6 +338,8 @@ class RemotiveV6(MovingCameraScene):
         # ================================================================
         # 21.0–26.0  ACTION — a brief becomes an active system.
         self.clear()
+        self.camera.frame.move_to([0,0,0])
+        self.camera.frame.set_width(10.5)
         # ================================================================
         title4 = self.t("Now the system can act.", 38).set_width(8.8).to_edge(UP,buff=.55)
 
@@ -374,17 +384,18 @@ class RemotiveV6(MovingCameraScene):
         self.flow(node_rings[0].get_bottom(),output_box.get_top(),self.C["green"],.35)
 
         # Push in toward the result; this is the payoff, not a static card.
-        self.play(
+        play(
             self.camera.frame.animate.move_to([0,-.4,0]).set_width(8.7),
             output_box.animate.scale(1.05),
             run_time=.65,
         )
-        elapsed += .65
         until(26.0)
 
         # ================================================================
         # 26.0–30.0  HERO — one idea continuously transforms.
         self.clear()
+        self.camera.frame.move_to([0,0,0])
+        self.camera.frame.set_width(10.5)
         # ================================================================
         kicker2 = self.t("THE DIFFERENCE",20,self.C["muted"]).to_edge(UP,buff=.5)
         final = self.t("Don't animate the words.\nAnimate the idea.", 52)
@@ -424,9 +435,8 @@ class RemotiveV6(MovingCameraScene):
         play(FadeIn(payoff,shift=UP*.15),run_time=.35)
 
         # Final camera move gives the line a cinematic finish.
-        self.play(
+        play(
             self.camera.frame.animate.move_to([0,-.15,0]).set_width(9.55),
             run_time=.55,
         )
-        elapsed += .55
         until(30.0)
