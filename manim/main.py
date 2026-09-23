@@ -112,7 +112,8 @@ class RemotiveV41(MovingCameraScene):
             examples: [3.15, -0.45, 0],
         }
 
-        self.play(Create(center[0]), FadeIn(center[1], scale=0.7), run_time=0.45)
+        center.set_opacity(1)
+        self.play(FadeIn(center, scale=0.7), run_time=0.45)
         self.play(
             *[
                 mob.animate.move_to(pos).scale(0.92).set_opacity(1)
