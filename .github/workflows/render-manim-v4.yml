@@ -87,16 +87,16 @@ jobs:
 
       - name: Render Manim V6
         run: |
-          manim -r 1080,1920 --fps 30 --format mp4 -o remotive-v5 manim/main.py RemotiveV6
-          VIDEO=$(find media -type f -name 'remotive-v5.mp4' | head -n 1)
+          manim -r 1080,1920 --fps 30 --format mp4 -o remotive-v6 manim/main.py RemotiveV6
+          VIDEO=$(find media -type f -name 'remotive-v6.mp4' | head -n 1)
           test -n "$VIDEO"
-          ffmpeg -y -i "$VIDEO" -i public/voice.wav             -map 0:v:0 -map 1:a:0             -c:v libx264 -pix_fmt yuv420p             -c:a aac -b:a 128k -t 30             out/remotive-v5-storyboard-pro.mp4
+          ffmpeg -y -i "$VIDEO" -i public/voice.wav             -map 0:v:0 -map 1:a:0             -c:v libx264 -pix_fmt yuv420p             -c:a aac -b:a 128k -t 30             out/remotive-v6-storyboard-pro.mp4
 
       - name: Validate output
         run: |
-          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 out/remotive-v5-storyboard-pro.mp4)
-          AUDIO=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 out/remotive-v5-storyboard-pro.mp4)
-          VIDEO=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 out/remotive-v5-storyboard-pro.mp4)
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 out/remotive-v6-storyboard-pro.mp4)
+          AUDIO=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 out/remotive-v6-storyboard-pro.mp4)
+          VIDEO=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 out/remotive-v6-storyboard-pro.mp4)
           python -c "d=float('$DURATION'); assert 29.5 <= d <= 30.1, f'Video duration invalid: {d:.3f}s'; print(f'Validated duration: {d:.3f}s')"
           test "$VIDEO" = "h264"
           test "$AUDIO" = "aac"
@@ -105,6 +105,6 @@ jobs:
       - name: Upload MP4
         uses: actions/upload-artifact@v4
         with:
-          name: remotive-video-studio-manim-v5-storyboard-pro
-          path: out/remotive-v5-storyboard-pro.mp4
+          name: remotive-video-studio-manim-v6-cinematic
+          path: out/remotive-v6-storyboard-pro.mp4
           if-no-files-found: error
