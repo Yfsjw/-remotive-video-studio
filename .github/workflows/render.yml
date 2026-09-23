@@ -2,6 +2,9 @@ name: Render MP4
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - v7-visual-storytelling
 
 jobs:
   render:
