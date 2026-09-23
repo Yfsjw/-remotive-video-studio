@@ -1,24 +1,9 @@
 {
-  "name": "remotive-video-studio",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Standalone Remotion video rendering studio.",
-  "scripts": {
-    "start": "remotion studio",
-    "preview": "remotion preview",
-    "render": "remotion render src/index.tsx Main out/main.mp4",
-    "render:fast": "remotion render src/index.tsx Main out/main.mp4 --concurrency=2",
-    "check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@remotion/cli": "4.0.526",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
-    "remotion": "4.0.526"
-  },
-  "devDependencies": {
-    "@types/react": "19.1.13",
-    "@types/react-dom": "19.1.9",
-    "typescript": "5.9.2"
-  }
+  "name":"visual-engine-prototype",
+  "version":"0.1.0",
+  "private":true,
+  "description":"Five-second visual-engine prototype using Manim and Remotion.",
+  "scripts":{"start":"remotion studio","render":"remotion render src/index.tsx Scene01 out/scene01.mp4","check":"tsc --noEmit"},
+  "dependencies":{"@remotion/cli":"4.0.526","react":"19.1.1","react-dom":"19.1.1","remotion":"4.0.526"},
+  "devDependencies":{"@types/react":"19.1.13","@types/react-dom":"19.1.9","typescript":"5.9.2"}
 }
