@@ -2,6 +2,9 @@ name: Render Manim V4 Prototype
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - manim-v4-prototype
 
 jobs:
   render-manim:
