@@ -1,0 +1,110 @@
+name: Render Manim V6 Cinematic
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - manim-v6-cinematic
+
+jobs:
+  render-manim:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev pkg-config
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install manim piper-tts
+
+      - name: Generate storyboard narration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/voice_segments out
+          python -m piper.download_voices --data-dir public en_US-ryan-medium
+
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          sentences = [
+              ("01", "Most prompts fail before AI answers.", 3.4),
+              ("02", "The fix is not more words. Turn the words into a brief.", 4.1),
+              ("03", "Context changes the answer. The same request can mean different things in different worlds.", 4.5),
+              ("04", "Constraints remove noise: format, length, audience, and one clear idea.", 4.5),
+              ("05", "Examples teach behavior. They show the style, structure, and rhythm you actually want.", 4.5),
+              ("06", "Now the system can act: research, explain, or build — and produce a specific result.", 5.0),
+              ("07", "The difference is simple. Don't animate the words. Animate the idea.", 4.0),
+          ]
+
+          root = Path("public/voice_segments")
+          concat = root / "concat.txt"
+          lines = []
+
+          for idx, text, target in sentences:
+              raw = root / f"{idx}-raw.wav"
+              padded = root / f"{idx}.wav"
+              subprocess.run(
+                  [
+                      "python", "-m", "piper",
+                      "-m", "en_US-ryan-medium",
+                      "--data-dir", "public",
+                      "--length_scale", "0.88",
+                      "-f", str(raw),
+                  ],
+                  input=text + "\n",
+                  text=True,
+                  check=True,
+              )
+              subprocess.run(
+                  [
+                      "ffmpeg", "-y", "-i", str(raw),
+                      "-af", f"apad=whole_dur={target:.3f},atrim=0:{target:.3f}",
+                      "-ar", "22050", "-ac", "1", str(padded),
+                  ],
+                  check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+              )
+              lines.append(f"file '{padded.resolve()}'")
+
+          concat.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+          ffmpeg -y -f concat -safe 0 -i public/voice_segments/concat.txt -c copy public/voice.wav
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 public/voice.wav)
+          python -c "d=float('$DURATION'); assert 29.5 <= d <= 30.1, f'Unexpected narration duration: {d:.3f}s'; print(f'Narration duration: {d:.3f}s')"
+
+      - name: Render Manim V6
+        run: |
+          manim -r 1080,1920 --fps 30 --format mp4 -o remotive-v6 manim/main.py RemotiveV6
+          VIDEO=$(find media -type f -name 'remotive-v6.mp4' | head -n 1)
+          test -n "$VIDEO"
+          ffmpeg -y -i "$VIDEO" -i public/voice.wav             -map 0:v:0 -map 1:a:0             -c:v libx264 -pix_fmt yuv420p             -c:a aac -b:a 128k -t 30             out/remotive-v6-storyboard-pro.mp4
+
+      - name: Validate output
+        run: |
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 out/remotive-v6-storyboard-pro.mp4)
+          AUDIO=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 out/remotive-v6-storyboard-pro.mp4)
+          VIDEO=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 out/remotive-v6-storyboard-pro.mp4)
+          python -c "d=float('$DURATION'); assert 29.5 <= d <= 30.1, f'Video duration invalid: {d:.3f}s'; print(f'Validated duration: {d:.3f}s')"
+          test "$VIDEO" = "h264"
+          test "$AUDIO" = "aac"
+          echo "Validated H.264 video + AAC audio"
+
+      - name: Upload MP4
+        uses: actions/upload-artifact@v4
+        with:
+          name: remotive-video-studio-manim-v6-cinematic
+          path: out/remotive-v6-storyboard-pro.mp4
+          if-no-files-found: error
