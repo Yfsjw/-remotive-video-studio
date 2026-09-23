@@ -1,10 +1,10 @@
-name: Render Manim V5 Storyboard Pro
+name: Render Manim V6 Cinematic
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - manim-v5-storyboard-pro
+      - manim-v6-cinematic
 
 jobs:
   render-manim:
@@ -85,9 +85,9 @@ jobs:
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 public/voice.wav)
           python -c "d=float('$DURATION'); assert 29.5 <= d <= 30.1, f'Unexpected narration duration: {d:.3f}s'; print(f'Narration duration: {d:.3f}s')"
 
-      - name: Render Manim V5
+      - name: Render Manim V6
         run: |
-          manim -r 1080,1920 --fps 30 --format mp4 -o remotive-v5 manim/main.py RemotiveV5
+          manim -r 1080,1920 --fps 30 --format mp4 -o remotive-v5 manim/main.py RemotiveV6
           VIDEO=$(find media -type f -name 'remotive-v5.mp4' | head -n 1)
           test -n "$VIDEO"
           ffmpeg -y -i "$VIDEO" -i public/voice.wav             -map 0:v:0 -map 1:a:0             -c:v libx264 -pix_fmt yuv420p             -c:a aac -b:a 128k -t 30             out/remotive-v5-storyboard-pro.mp4
