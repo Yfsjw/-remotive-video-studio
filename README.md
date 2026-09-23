@@ -1,51 +1,16 @@
-# Remotive Video Studio
+# Visual Engine Prototype
 
-A standalone Remotion project for generating real MP4 videos from React code.
+This branch is an architectural experiment, not V9.
 
-## Current MVP
+Test sentence: "Turn noise into evidence."
 
-- Remotion 4
-- 1080x1920 vertical composition
-- 30 FPS
-- 5-second test composition
-- Animated intro/outro
-- MP4 H.264 output
-- GitHub Actions render workflow
+The visual shows scattered information converging through a filter into one clear signal. No explanatory text is required.
 
-## Local usage
+Pipeline:
 
-Install dependencies:
+Script -> storyboard -> Manim -> Remotion -> MP4
 
-```bash
-npm install
-```
+Manim owns the primary visual animation.
+Remotion owns composition and final rendering.
 
-Preview:
-
-```bash
-npm run start
-```
-
-Render MP4:
-
-```bash
-npm run render
-```
-
-Output:
-
-```
-out/main.mp4
-```
-
-## Architecture
-
-```
-src/index.tsx
-  -> src/Root.tsx
-      -> src/Main.tsx
-          -> Remotion renderer
-              -> MP4
-```
-
-This repository is intentionally independent from the existing short-form-video-studio project.
+Do not expand beyond this five-second test until the visual language passes review.
