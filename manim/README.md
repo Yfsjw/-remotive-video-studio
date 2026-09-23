@@ -1,0 +1,1 @@
+# Manim V4 prototype\n\nThis is an isolated prototype for the new explanatory-animation renderer. It does not replace the existing Remotion pipeline.\n\nThe scene uses programmatic objects, transformations, camera-like reframing, and continuous visual progression rather than card-based layouts.\n
