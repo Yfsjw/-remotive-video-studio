@@ -1,6 +1,8 @@
 name: Render Visual Engine Prototype
 on:
   workflow_dispatch:
+  push:
+    branches: [visual-engine-prototype]
 jobs:
   render:
     runs-on: ubuntu-latest
