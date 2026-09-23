@@ -283,9 +283,9 @@ class RemotiveV6(MovingCameraScene):
         title3 = self.t("Examples teach what words cannot.", 37).set_width(8.8).to_edge(UP,buff=.55)
 
         # Three reference "windows", each is a different visual language.
-        frameA = self.stroke_box(2.65,3.35,self.C["cyan"],"#0B111A",1).move_to([-3.0,1.7,0])
-        frameB = self.stroke_box(2.65,3.35,self.C["violet"],"#0B111A",1).move_to([0,1.7,0])
-        frameC = self.stroke_box(2.65,3.35,self.C["green"],"#0B111A",1).move_to([3.0,1.7,0])
+        frameA = self.stroke_box(2.65,3.35,self.C["cyan"],"#0B111A",1).move_to([-3.0,1.2,0])
+        frameB = self.stroke_box(2.65,3.35,self.C["violet"],"#0B111A",1).move_to([0,1.2,0])
+        frameC = self.stroke_box(2.65,3.35,self.C["green"],"#0B111A",1).move_to([3.0,1.2,0])
 
         # A: analytical graph
         ax = VGroup(
@@ -327,6 +327,7 @@ class RemotiveV6(MovingCameraScene):
         # Each reference sends a distinct signal into one common pattern.
         for start,col in [([-3.0,.0,0],self.C["cyan"]),([0,.0,0],self.C["violet"]),([3.0,.0,0],self.C["green"])]:
             self.flow(start,[0,-2.25,0],col,.28)
+            elapsed += .28
         self.play(
             learned_ring.animate.scale(1.35).set_opacity(.15),
             self.camera.frame.animate.move_to([0,-.1,0]).set_width(9.8),
@@ -380,8 +381,10 @@ class RemotiveV6(MovingCameraScene):
             run_time=.45,
         )
         self.flow(nucleus.get_bottom(),node_rings[0].get_top(),self.C["blue"],.35)
+        elapsed += .35
         play(FadeIn(output_box,shift=UP*.2),FadeIn(output),Create(result_lines),run_time=.65)
         self.flow(node_rings[0].get_bottom(),output_box.get_top(),self.C["green"],.35)
+        elapsed += .35
 
         # Push in toward the result; this is the payoff, not a static card.
         play(
@@ -432,6 +435,7 @@ class RemotiveV6(MovingCameraScene):
             run_time=.55,
         )
         self.flow(idea.get_center(),action.get_center(),self.C["green"],.3)
+        elapsed += .3
         play(FadeIn(payoff,shift=UP*.15),run_time=.35)
 
         # Final camera move gives the line a cinematic finish.
