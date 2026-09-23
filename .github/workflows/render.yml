@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - v7-visual-storytelling
+  pull_request:
+    branches:
+      - main
 
 jobs:
   render:
