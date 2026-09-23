@@ -22,7 +22,7 @@ jobs:
         run: |
           mkdir -p public/manim
           manim -qh visual/scene_01.py Scene01 -o scene01.mp4
-          cp media/videos/scene_01/1080p30/scene01.mp4 public/manim/scene01.mp4
+          cp media/videos/scene_01/1920p30/scene01.mp4 public/manim/scene01.mp4
       - name: Install Remotion
         run: npm install
       - name: Generate five-second US English voice
