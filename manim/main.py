@@ -119,8 +119,9 @@ class RemotiveV6(MovingCameraScene):
 
         # ================================================================
         # 3.4–7.5  TRANSFORMATION — semantic structure emerges from chaos.
+        self.clear()
         # ================================================================
-        new_title = self.t("Structure is the first transformation.", 39).to_edge(UP, buff=.55)
+        new_title = self.t("Structure is the first transformation.", 36).set_width(8.8).to_edge(UP, buff=.55)
         center = self.t("PROMPT", 34, self.C["white"]).move_to([0, .5, 0])
         center_ring = self.ring(.72, self.C["cyan"], 2.5).move_to(center)
 
@@ -169,8 +170,9 @@ class RemotiveV6(MovingCameraScene):
 
         # ================================================================
         # 7.5–12.0  CONTEXT — one request splits into two worlds.
+        self.clear()
         # ================================================================
-        title = self.t("Same words. Different world.", 42).to_edge(UP, buff=.55)
+        title = self.t("Same words. Different world.", 38).set_width(8.8).to_edge(UP, buff=.55)
         request = self.t("LAUNCH POST", 34, self.C["white"]).move_to([0, 3.7, 0])
         request_ring = self.ring(.9, self.C["cyan"], 2.5).move_to(request)
 
@@ -233,8 +235,9 @@ class RemotiveV6(MovingCameraScene):
 
         # ================================================================
         # 12.0–16.5  CONSTRAINTS — an infinite stream is physically narrowed.
+        self.clear()
         # ================================================================
-        title2 = self.t("Constraints turn infinity into a decision.", 39).to_edge(UP,buff=.55)
+        title2 = self.t("Constraints turn infinity into a decision.", 35).set_width(8.8).to_edge(UP,buff=.55)
 
         stream = self.particle_stream(30,-4.8,-1.4,5.0,self.C["muted"])
         stream.shift(DOWN*.2)
@@ -275,8 +278,9 @@ class RemotiveV6(MovingCameraScene):
 
         # ================================================================
         # 16.5–21.0  EXAMPLES — references become a learned visual rhythm.
+        self.clear()
         # ================================================================
-        title3 = self.t("Examples teach what words cannot.", 40).to_edge(UP,buff=.55)
+        title3 = self.t("Examples teach what words cannot.", 37).set_width(8.8).to_edge(UP,buff=.55)
 
         # Three reference "windows", each is a different visual language.
         frameA = self.stroke_box(2.65,3.35,self.C["cyan"],"#0B111A",1).move_to([-3.0,1.7,0])
@@ -335,8 +339,9 @@ class RemotiveV6(MovingCameraScene):
 
         # ================================================================
         # 21.0–26.0  ACTION — a brief becomes an active system.
+        self.clear()
         # ================================================================
-        title4 = self.t("Now the system can act.", 42).to_edge(UP,buff=.55)
+        title4 = self.t("Now the system can act.", 38).set_width(8.8).to_edge(UP,buff=.55)
 
         nucleus = self.t("SPEC", 31, self.C["white"]).move_to([0,3.3,0])
         nucleus_ring = self.ring(.78,self.C["white"],2.5).move_to(nucleus)
@@ -392,9 +397,10 @@ class RemotiveV6(MovingCameraScene):
 
         # ================================================================
         # 26.0–30.0  HERO — one idea continuously transforms.
+        self.clear()
         # ================================================================
         kicker2 = self.t("THE DIFFERENCE",20,self.C["muted"]).to_edge(UP,buff=.5)
-        final = self.t("Don't animate the words.\nAnimate the idea.", 55)
+        final = self.t("Don't animate the words.\nAnimate the idea.", 52)
         final.set_width(9.0).move_to([0,5.35,0])
 
         idea = self.t("IDEA", 32, self.C["violet"]).move_to([0,.3,0])
