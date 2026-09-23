@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - visual-engine-v9
+      - visual-engine-v10
       - main
 
 jobs:
@@ -32,21 +32,23 @@ jobs:
         run: |
           mkdir -p public
           python -m piper.download_voices --data-dir public en_US-lessac-high
-          printf '%s\n' "Three things ChatGPT can do that most people don't know. The third one can save you hours." | python -m piper -m en_US-lessac-high --data-dir public -f scene1.wav --length_scale 0.86
-          printf '%s\n' "First: research. Give ChatGPT a messy question, your goal, and your constraints. It can compare options, spot gaps, and turn the research into a clear plan." | python -m piper -m en_US-lessac-high --data-dir public -f scene2.wav --length_scale 0.86
-          printf '%s\n' "Second: understand. Give it a difficult idea. Then ask it to teach that idea at your level, with examples and simpler language." | python -m piper -m en_US-lessac-high --data-dir public -f scene3.wav --length_scale 0.86
-          printf '%s\n' "Third: build. Give it a rough outcome, and it can turn that idea into code, scripts, checklists, or a first draft. Start with the result, not the tool." | python -m piper -m en_US-lessac-high --data-dir public -f scene4.wav --length_scale 0.86
+          printf '%s\n' "Three things ChatGPT can do that most people don't know. It can move from a question to research, understanding, and a usable result." | python -m piper -m en_US-lessac-high --data-dir public -f scene1.wav --length_scale 0.86
+          printf '%s\n' "First: research. Give ChatGPT a goal and constraints. Compare evidence, expose gaps, then turn the findings into a clear next move." | python -m piper -m en_US-lessac-high --data-dir public -f scene2.wav --length_scale 0.86
+          printf '%s\n' "Second: understand. Move from a difficult abstraction to an analogy and a simple example, then connect the idea back to something you can use." | python -m piper -m en_US-lessac-high --data-dir public -f scene3.wav --length_scale 0.86
+          printf '%s\n' "Third: build. A rough result can become code, a script, a checklist, or a first draft. Start from the output." | python -m piper -m en_US-lessac-high --data-dir public -f scene4.wav --length_scale 0.86
           ffmpeg -y -i scene1.wav -i scene2.wav -i scene3.wav -i scene4.wav -filter_complex "[0:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:5.50[a0];[1:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:9.25[a1];[2:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:6.50[a2];[3:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:8.75[a3];[a0][a1][a2][a3]concat=n=4:v=0:a=1,atrim=0:30[a]" -map "[a]" -ar 22050 -ac 1 public/voice.wav
+      - name: Typecheck
+        run: npm run check
       - name: Render video
         run: npm run render
       - name: Verify output
         run: |
           test -s out/main.mp4
-          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,codec_name -of default=nw=1 out/main.mp4
-          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate -of default=nw=1 out/main.mp4
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,codec_name,duration -of default=nw=1 out/main.mp4
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,duration -of default=nw=1 out/main.mp4
       - name: Upload MP4
         uses: actions/upload-artifact@v4
         with:
-          name: remotive-v9-visual-engine
+          name: remotive-v10-visual-engine
           path: out/main.mp4
           if-no-files-found: error
