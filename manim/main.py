@@ -6,61 +6,97 @@ config.pixel_width = 1080
 config.pixel_height = 1920
 
 
-class RemotiveV42(MovingCameraScene):
+class RemotiveV5(MovingCameraScene):
     """
-    V4.2: narration-driven explanatory animation.
-    The visual beats are locked to the eight narration beats rendered by CI.
+    V5: storyboard-first explanatory video.
+    The visuals are concrete metaphors rather than a generic node graph:
+    broken prompt -> structured brief -> context split -> constraints -> examples
+    -> action -> finished result.
     """
 
     C = {
+        "bg": "#05070B",
+        "white": "#F8FAFC",
+        "muted": "#94A3B8",
         "cyan": "#38BDF8",
         "violet": "#A78BFA",
         "amber": "#F59E0B",
         "green": "#34D399",
+        "red": "#FB7185",
         "blue": "#60A5FA",
-        "white": "#F8FAFC",
-        "muted": "#94A3B8",
+        "panel": "#0D141F",
+        "panel2": "#111B29",
         "line": "#334155",
-        "panel": "#0B111A",
     }
 
-    BEATS = [0.0, 2.6, 4.3, 8.2, 15.4, 19.7, 24.9, 27.4, 30.0]
+    BEATS = [0, 3.4, 7.5, 12.0, 16.5, 21.0, 26.0, 30.0]
 
-    def node(self, label, color, point, radius=0.62, size=24):
-        c = Circle(
-            radius=radius,
+    def txt(self, s, size=30, color=None, bold=True):
+        return Text(
+            s,
+            font_size=size,
+            color=color or self.C["white"],
+            weight=BOLD if bold else NORMAL,
+        )
+
+    def card(self, w, h, title=None, accent=None, fill=None):
+        box = RoundedRectangle(
+            corner_radius=0.18,
+            width=w,
+            height=h,
+            stroke_color=accent or self.C["line"],
+            stroke_width=2.5,
+            fill_color=fill or self.C["panel"],
+            fill_opacity=1,
+        )
+        if title:
+            t = self.txt(title, 22, accent or self.C["white"])
+            t.move_to(box.get_top() + DOWN * 0.38)
+            return VGroup(box, t)
+        return box
+
+    def pill(self, label, color, w=2.0):
+        box = RoundedRectangle(
+            corner_radius=0.18,
+            width=w,
+            height=0.62,
             stroke_color=color,
-            stroke_width=4,
-            fill_color=self.C["panel"],
+            stroke_width=2,
+            fill_color=color,
+            fill_opacity=0.12,
+        )
+        t = self.txt(label, 20, color)
+        t.move_to(box.get_center())
+        return VGroup(box, t)
+
+    def word_token(self, label, point, color):
+        box = RoundedRectangle(
+            corner_radius=0.12,
+            width=max(1.25, 0.13 * len(label) + 0.75),
+            height=0.58,
+            stroke_color=color,
+            stroke_width=2,
+            fill_color=self.C["panel2"],
             fill_opacity=1,
         ).move_to(point)
-        t = Text(label, font_size=size, weight=BOLD, color=color).move_to(point)
-        return VGroup(c, t)
+        t = self.txt(label, 19, color)
+        t.move_to(box.get_center())
+        return VGroup(box, t)
 
-    def link(self, a, b, color=None, width=3, opacity=0.72):
+    def tiny_line(self, x, y, width, color=None):
         return Line(
-            a.get_center(),
-            b.get_center(),
+            [x, y, 0],
+            [x + width, y, 0],
             color=color or self.C["line"],
-            stroke_width=width,
-            stroke_opacity=opacity,
+            stroke_width=4,
+            stroke_opacity=0.85,
         )
 
-    def dot_flow(self, a, b, color):
-        d = Dot(a.get_center(), radius=0.09, color=color)
-        self.play(MoveAlongPath(d, Line(a.get_center(), b.get_center()), rate_func=smooth), run_time=0.38)
+    def flow_dot(self, start, end, color, run_time=0.35):
+        d = Dot(start, radius=0.075, color=color)
+        self.add(d)
+        self.play(d.animate.move_to(end), run_time=run_time, rate_func=smooth)
         self.remove(d)
-
-    def caption(self, text, color=None):
-        t = Text(
-            text,
-            font_size=23,
-            weight=BOLD,
-            color=color or self.C["muted"],
-        )
-        t.set_width(9.0)
-        t.move_to([0, -8.25, 0])
-        return t
 
     def construct(self):
         self.camera.frame.set_width(10.5)
@@ -73,292 +109,312 @@ class RemotiveV42(MovingCameraScene):
 
         def wait_until(target):
             nonlocal elapsed
-            gap = target - elapsed
-            if gap > 0:
-                self.wait(gap)
+            if target > elapsed:
+                self.wait(target - elapsed)
                 elapsed = target
 
-        # ------------------------------------------------------------------
-        # Beat 1 — 0.0–2.6
-        # "A prompt is not a sentence."
-        # ------------------------------------------------------------------
-        kicker = Text("THE PROBLEM", font_size=24, weight=BOLD, color=self.C["muted"])
-        kicker.move_to([0, 7.9, 0])
+        # ---------------------------------------------------------------
+        # 0.0–3.4 — HOOK: show the problem as an object, not a diagram.
+        # ---------------------------------------------------------------
+        eyebrow = self.txt("THE HIDDEN PROBLEM", 21, self.C["muted"])
+        eyebrow.move_to([0, 8.0, 0])
 
-        hook = Text("A prompt is not a sentence.", font_size=54, weight=BOLD, color=self.C["white"])
-        hook.set_width(9.2)
-        hook.move_to([0, 5.7, 0])
+        hook = self.txt("Most prompts fail\nbefore AI answers.", 55)
+        hook.set_width(8.9)
+        hook.move_to([0, 5.9, 0])
 
-        underline = Line([-4.0, 4.85, 0], [4.0, 4.85, 0], color=self.C["cyan"], stroke_width=5)
+        sheet = RoundedRectangle(
+            corner_radius=0.22, width=7.5, height=4.2,
+            stroke_color=self.C["red"], stroke_width=3,
+            fill_color=self.C["panel"], fill_opacity=1,
+        ).move_to([0, -1.0, 0]).rotate(-0.035)
 
-        play(FadeIn(kicker, shift=DOWN * 0.2), FadeIn(hook, shift=UP * 0.25), run_time=0.85)
-        play(Create(underline), run_time=0.35)
-        wait_until(2.6)
+        messy = VGroup(
+            self.word_token("goal?", [-2.4, 0.0, 0], self.C["muted"]),
+            self.word_token("context", [0.5, 0.8, 0], self.C["violet"]),
+            self.word_token("do this", [-1.2, -1.0, 0], self.C["white"]),
+            self.word_token("maybe", [2.1, -0.2, 0], self.C["amber"]),
+            self.word_token("examples...", [0.8, -1.7, 0], self.C["muted"]),
+        )
+        mess = VGroup(sheet, messy)
 
-        # ------------------------------------------------------------------
-        # Beat 2 — 2.6–4.3
-        # "It is a system."
-        # ------------------------------------------------------------------
-        system = Text("It is a SYSTEM.", font_size=64, weight=BOLD, color=self.C["white"])
-        system.move_to([0, 5.8, 0])
+        x1 = Line([-3.0, -2.55, 0], [3.0, 0.65, 0], color=self.C["red"], stroke_width=7)
+        x2 = Line([-3.0, 0.65, 0], [3.0, -2.55, 0], color=self.C["red"], stroke_width=7)
 
-        orbit = Circle(radius=2.15, color=self.C["cyan"], stroke_width=3).move_to([0, 0.6, 0])
-        core = Circle(radius=0.82, color=self.C["white"], stroke_width=4, fill_color=self.C["panel"], fill_opacity=1).move_to([0, 0.6, 0])
-        core_text = Text("INPUT", font_size=22, weight=BOLD, color=self.C["white"]).move_to(core.get_center())
+        play(FadeIn(eyebrow, shift=DOWN * .2), FadeIn(hook, shift=UP * .25), run_time=0.8)
+        play(FadeIn(mess, shift=UP * .25), run_time=0.8)
+        play(Create(x1), Create(x2), run_time=0.55)
+        wait_until(3.4)
+
+        # ---------------------------------------------------------------
+        # 3.4–7.5 — TRANSFORMATION: chaos becomes a usable brief.
+        # ---------------------------------------------------------------
+        title = self.txt("Turn words into a brief.", 40)
+        title.move_to([0, 7.2, 0])
+
+        brief = RoundedRectangle(
+            corner_radius=0.22, width=8.7, height=8.4,
+            stroke_color=self.C["cyan"], stroke_width=3,
+            fill_color=self.C["panel"], fill_opacity=1,
+        ).move_to([0, -0.5, 0])
+
+        header = self.txt("PROMPT / BRIEF", 25, self.C["cyan"])
+        header.move_to([-2.7, 3.15, 0])
+
+        sections = VGroup(
+            self.pill("GOAL", self.C["cyan"], 1.65),
+            self.pill("CONTEXT", self.C["violet"], 2.0),
+            self.pill("CONSTRAINTS", self.C["amber"], 2.35),
+            self.pill("EXAMPLES", self.C["green"], 2.0),
+        ).arrange(DOWN, buff=0.48).move_to([-2.65, 0.3, 0])
+
+        details = VGroup(
+            self.tiny_line(-0.9, 2.0, 4.3, self.C["cyan"]),
+            self.tiny_line(-0.9, 1.2, 3.7),
+            self.tiny_line(-0.9, 0.4, 4.0),
+            self.tiny_line(-0.9, -0.4, 3.2),
+            self.tiny_line(-0.9, -1.2, 4.2),
+            self.tiny_line(-0.9, -2.0, 3.5),
+        )
+
+        output = RoundedRectangle(
+            corner_radius=0.18, width=6.4, height=1.2,
+            stroke_color=self.C["green"], stroke_width=2.5,
+            fill_color=self.C["green"], fill_opacity=.10,
+        ).move_to([0, -3.25, 0])
+        output_text = self.txt("CLEAR INPUT → BETTER OUTPUT", 25, self.C["green"])
+        output_text.move_to(output.get_center())
 
         play(
-            FadeOut(kicker),
-            Transform(hook, system),
-            FadeOut(underline),
-            Create(orbit),
-            FadeIn(core, scale=0.7),
-            FadeIn(core_text, scale=0.7),
-            run_time=0.9,
+            FadeOut(eyebrow), FadeOut(hook), FadeOut(mess), FadeOut(x1), FadeOut(x2),
+            FadeIn(title, shift=DOWN*.2), FadeIn(brief, scale=.94),
+            run_time=.85,
         )
-        wait_until(4.3)
+        play(FadeIn(header), FadeIn(sections, shift=RIGHT*.25), FadeIn(details), run_time=.75)
+        play(FadeIn(output, shift=UP*.2), FadeIn(output_text), run_time=.5)
 
-        # ------------------------------------------------------------------
-        # Beat 3 — 4.3–8.2
-        # "You start with a goal, context, constraints, and examples."
-        # ------------------------------------------------------------------
-        goal = self.node("GOAL", self.C["cyan"], [-3.25, 2.55, 0], 0.72, 22)
-        context = self.node("CONTEXT", self.C["violet"], [3.25, 2.55, 0], 0.78, 20)
-        limits = self.node("LIMITS", self.C["amber"], [-3.25, -1.45, 0], 0.72, 22)
-        examples = self.node("EXAMPLES", self.C["green"], [3.25, -1.45, 0], 0.80, 19)
-
-        for n in [goal, context, limits, examples]:
-            n.set_opacity(0)
-
-        play(
-            FadeOut(system, shift=UP * 0.25),
-            FadeOut(orbit),
-            FadeOut(core),
-            FadeOut(core_text),
-            *[FadeIn(n, shift=UP * 0.25) for n in [goal, context, limits, examples]],
-            run_time=1.0,
-        )
-
-        links = VGroup(
-            self.link(goal, context),
-            self.link(context, examples),
-            self.link(examples, limits),
-            self.link(limits, goal),
-        )
-        play(Create(links), run_time=0.45)
-
-        for a, b, c in [
-            (goal, context, self.C["cyan"]),
-            (context, examples, self.C["violet"]),
-            (examples, limits, self.C["green"]),
-            (limits, goal, self.C["amber"]),
+        # Animate information entering the brief.
+        for src, dst, col in [
+            ([-3.7, -6.0, 0], [-1.8, 1.5, 0], self.C["cyan"]),
+            ([3.7, -6.0, 0], [-1.8, .0, 0], self.C["violet"]),
+            ([-3.7, 6.0, 0], [-1.8, -1.5, 0], self.C["amber"]),
         ]:
-            self.dot_flow(a, b, c)
+            self.flow_dot(src, dst, col, .25)
+        wait_until(7.5)
 
-        wait_until(8.2)
+        # ---------------------------------------------------------------
+        # 7.5–12.0 — CONTEXT: same request, different world.
+        # ---------------------------------------------------------------
+        context_title = self.txt("Context changes the answer.", 40)
+        context_title.move_to([0, 7.25, 0])
 
-        # ------------------------------------------------------------------
-        # Beat 4 — 8.2–15.4
-        # "When those pieces connect ... usable specification."
-        # ------------------------------------------------------------------
-        spec = self.node("SPEC", self.C["white"], [0, 0.55, 0], 1.08, 30)
-        spec.set_opacity(0)
+        question = RoundedRectangle(
+            corner_radius=.16, width=8.2, height=1.15,
+            stroke_color=self.C["white"], stroke_width=2,
+            fill_color=self.C["panel2"], fill_opacity=1,
+        ).move_to([0, 5.3, 0])
+        qtext = self.txt("“Write a launch post for this product.”", 25)
+        qtext.move_to(question.get_center())
 
-        spec_label = Text("CONNECTED → USABLE", font_size=25, weight=BOLD, color=self.C["muted"])
-        spec_label.move_to([0, 6.9, 0])
+        left = self.card(3.9, 5.6, "STARTUP", self.C["violet"])
+        left.move_to([-2.35, 0.6, 0])
+        left_body = VGroup(
+            self.txt("audience: founders", 19, self.C["muted"]),
+            self.txt("tone: technical", 19, self.C["muted"]),
+            self.txt("goal: sign-ups", 19, self.C["violet"]),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=.38).move_to(left.get_center()+DOWN*.2)
 
-        play(FadeIn(spec_label, shift=DOWN * 0.2), FadeIn(spec, scale=0.65), run_time=0.7)
+        right = self.card(3.9, 5.6, "CONSUMER", self.C["amber"])
+        right.move_to([2.35, 0.6, 0])
+        right_body = VGroup(
+            self.txt("audience: gamers", 19, self.C["muted"]),
+            self.txt("tone: energetic", 19, self.C["muted"]),
+            self.txt("goal: clicks", 19, self.C["amber"]),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=.38).move_to(right.get_center()+DOWN*.2)
 
-        destinations = {
-            goal: [-3.15, 3.25, 0],
-            context: [3.15, 3.25, 0],
-            limits: [-3.15, -2.05, 0],
-            examples: [3.15, -2.05, 0],
-        }
-        play(
-            *[n.animate.move_to(p).scale(0.9) for n, p in destinations.items()],
-            run_time=0.9,
-        )
-
-        causal = VGroup(
-            self.link(goal, spec, self.C["cyan"], 4, 0.85),
-            self.link(context, spec, self.C["violet"], 4, 0.85),
-            self.link(limits, spec, self.C["amber"], 4, 0.85),
-            self.link(examples, spec, self.C["green"], 4, 0.85),
-        )
-        play(Create(causal), run_time=0.65)
-
-        for n, col in [(goal, self.C["cyan"]), (context, self.C["violet"]), (limits, self.C["amber"]), (examples, self.C["green"])]:
-            self.dot_flow(n, spec, col)
-
-        # Turn the specification into a structured decision point.
-        research = self.node("RESEARCH", self.C["blue"], [-3.15, -5.0, 0], 0.82, 19)
-        explain = self.node("EXPLAIN", self.C["violet"], [0, -6.05, 0], 0.80, 20)
-        build = self.node("BUILD", self.C["amber"], [3.15, -5.0, 0], 0.76, 21)
-
-        branch = VGroup(
-            self.link(spec, research, self.C["blue"], 3, 0.75),
-            self.link(spec, explain, self.C["violet"], 3, 0.75),
-            self.link(spec, build, self.C["amber"], 3, 0.75),
-        )
-        play(
-            FadeIn(research, shift=UP * 0.35),
-            FadeIn(explain, shift=UP * 0.35),
-            FadeIn(build, shift=UP * 0.35),
-            Create(branch),
-            run_time=1.0,
-        )
-        wait_until(15.4)
-
-        # ------------------------------------------------------------------
-        # Beat 5 — 15.4–19.7
-        # "That structure determines what happens next: research, explanation, or building."
-        # ------------------------------------------------------------------
-        next_label = Text("THE NEXT ACTION IS A CONSEQUENCE.", font_size=28, weight=BOLD, color=self.C["white"])
-        next_label.set_width(9.3)
-        next_label.move_to([0, 7.25, 0])
-
-        play(FadeIn(next_label, shift=DOWN * 0.2), run_time=0.45)
-
-        # Focus on RESEARCH and dim alternatives.
-        play(
-            research.animate.scale(1.18),
-            explain.animate.set_opacity(0.28),
-            build.animate.set_opacity(0.28),
-            run_time=0.55,
-        )
-
-        evidence = VGroup(
-            Dot([-2.55, -6.55, 0], radius=0.13, color=self.C["blue"]),
-            Dot([-1.85, -6.9, 0], radius=0.13, color=self.C["blue"]),
-            Dot([-1.15, -6.55, 0], radius=0.13, color=self.C["blue"]),
-        )
-        evidence_title = Text("EVIDENCE", font_size=21, weight=BOLD, color="#BFDBFE").move_to([-1.85, -7.35, 0])
-        evidence_links = VGroup(
-            self.link(research, evidence[0], self.C["blue"], 2, 0.7),
-            self.link(research, evidence[1], self.C["blue"], 2, 0.7),
-            self.link(research, evidence[2], self.C["blue"], 2, 0.7),
-        )
-        play(FadeIn(evidence, scale=0.4), FadeIn(evidence_title, shift=UP * 0.2), Create(evidence_links), run_time=0.75)
-
-        for d in evidence:
-            self.play(MoveAlongPath(Dot(research.get_center(), radius=0.07, color=self.C["blue"]),
-                                    Line(research.get_center(), d.get_center()), rate_func=smooth), run_time=0.3)
-
-        wait_until(19.7)
-
-        # ------------------------------------------------------------------
-        # Beat 6 — 19.7–24.9
-        # "And the plan can keep transforming until it becomes a real result."
-        # ------------------------------------------------------------------
-        play(
-            FadeOut(next_label),
-            FadeOut(causal),
-            FadeOut(branch),
-            FadeOut(goal),
-            FadeOut(context),
-            FadeOut(limits),
-            FadeOut(examples),
-            FadeOut(explain),
-            FadeOut(build),
-            FadeOut(spec_label),
-            FadeOut(research),
-            run_time=0.65,
-        )
-
-        action = self.node("ACTION", self.C["green"], [0, -1.0, 0], 1.12, 27)
-        action_title = Text("EVIDENCE → ACTION", font_size=34, weight=BOLD, color=self.C["white"])
-        action_title.move_to([0, 6.6, 0])
-
-        play(FadeIn(action_title, shift=DOWN * 0.2), FadeIn(action, scale=0.7), run_time=0.6)
+        out_l = self.pill("technical / precise", self.C["violet"], 3.0).move_to([-2.35, -3.15, 0])
+        out_r = self.pill("visual / punchy", self.C["amber"], 2.7).move_to([2.35, -3.15, 0])
 
         play(
-            evidence[0].animate.move_to([-1.35, 2.0, 0]),
-            evidence[1].animate.move_to([0, 2.55, 0]),
-            evidence[2].animate.move_to([1.35, 2.0, 0]),
-            evidence_title.animate.move_to([0, 3.4, 0]),
-            run_time=0.9,
+            FadeOut(title), FadeOut(brief), FadeOut(header), FadeOut(sections),
+            FadeOut(details), FadeOut(output), FadeOut(output_text),
+            FadeIn(context_title, shift=DOWN*.2), FadeIn(question, shift=UP*.15),
+            run_time=.8,
+        )
+        play(FadeIn(left, shift=RIGHT*.25), FadeIn(right, shift=LEFT*.25),
+             FadeIn(left_body), FadeIn(right_body), run_time=.8)
+        play(FadeIn(out_l, shift=UP*.2), FadeIn(out_r, shift=UP*.2), run_time=.5)
+        self.flow_dot(question.get_right(), right.get_top(), self.C["amber"], .3)
+        self.flow_dot(question.get_left(), left.get_top(), self.C["violet"], .3)
+        wait_until(12.0)
+
+        # ---------------------------------------------------------------
+        # 12.0–16.5 — CONSTRAINTS: narrow the infinite answer space.
+        # ---------------------------------------------------------------
+        ctitle = self.txt("Constraints remove noise.", 40)
+        ctitle.move_to([0, 7.25, 0])
+
+        funnel = VGroup(
+            Polygon(
+                [-3.5, 3.4, 0], [3.5, 3.4, 0], [1.25, -1.8, 0], [-1.25, -1.8, 0],
+                color=self.C["amber"], stroke_width=3, fill_color=self.C["panel"], fill_opacity=1,
+            ),
+            self.txt("INFINITE OPTIONS", 24, self.C["muted"]).move_to([0, 2.55, 0]),
+            self.txt("FORMAT", 20, self.C["amber"]).move_to([0, 1.2, 0]),
+            self.txt("LENGTH", 20, self.C["amber"]).move_to([0, .3, 0]),
+            self.txt("AUDIENCE", 20, self.C["amber"]).move_to([0, -.6, 0]),
         )
 
-        action_links = VGroup(
-            self.link(evidence[0], action, self.C["green"], 3, 0.8),
-            self.link(evidence[1], action, self.C["green"], 3, 0.8),
-            self.link(evidence[2], action, self.C["green"], 3, 0.8),
-        )
-        play(Create(action_links), run_time=0.55)
+        constraints = VGroup(
+            self.pill("9:16", self.C["cyan"], 1.45),
+            self.pill("30 sec", self.C["violet"], 1.65),
+            self.pill("ONE IDEA", self.C["green"], 2.0),
+        ).arrange(RIGHT, buff=.35).move_to([0, -3.25, 0])
 
-        action_words = VGroup(
-            Text("compare", font_size=25, color="#A7F3D0"),
-            Text("decide", font_size=25, color="#A7F3D0"),
-            Text("build", font_size=25, color="#A7F3D0"),
-        ).arrange(RIGHT, buff=0.5).move_to([0, -3.0, 0])
+        result = self.card(7.2, 1.65, None, self.C["green"], self.C["panel2"])
+        result.move_to([0, -5.0, 0])
+        result_text = self.txt("ONE CLEAR DELIVERABLE", 27, self.C["green"])
+        result_text.move_to(result.get_center())
 
-        play(FadeIn(action_words, shift=UP * 0.2), run_time=0.45)
-
-        self.play(
-            evidence[1].animate.scale(1.25),
-            action.animate.scale(1.08),
-            run_time=0.5,
-        )
-        elapsed += 0.5
-
-        wait_until(24.9)
-
-        # ------------------------------------------------------------------
-        # Beat 7 — 24.9–27.4
-        # "The important part is not decoration."
-        # ------------------------------------------------------------------
         play(
-            FadeOut(action_title),
-            FadeOut(action_words),
-            FadeOut(action_links),
-            FadeOut(evidence),
-            FadeOut(evidence_title),
-            run_time=0.5,
+            FadeOut(context_title), FadeOut(question), FadeOut(left), FadeOut(right),
+            FadeOut(left_body), FadeOut(right_body), FadeOut(out_l), FadeOut(out_r),
+            FadeIn(ctitle, shift=DOWN*.2), FadeIn(funnel, shift=UP*.2), run_time=.8,
         )
+        play(FadeIn(constraints, shift=UP*.2), run_time=.5)
+        play(FadeIn(result, shift=UP*.2), FadeIn(result_text), run_time=.55)
+        for p in [constraints[0].get_center(), constraints[1].get_center(), constraints[2].get_center()]:
+            self.flow_dot(p, [0, -4.15, 0], self.C["green"], .22)
+        wait_until(16.5)
 
-        principle = Text("NOT DECORATION.", font_size=56, weight=BOLD, color=self.C["amber"])
-        principle.move_to([0, 5.8, 0])
+        # ---------------------------------------------------------------
+        # 16.5–21.0 — EXAMPLES: show, don't merely describe.
+        # ---------------------------------------------------------------
+        etitle = self.txt("Examples teach the behavior.", 40)
+        etitle.move_to([0, 7.25, 0])
 
-        causal_text = Text("CAUSE  →  TRANSFORMATION  →  RESULT", font_size=29, weight=BOLD, color=self.C["white"])
-        causal_text.set_width(9.2)
-        causal_text.move_to([0, 1.2, 0])
+        refs = VGroup(
+            self.card(2.65, 3.2, "REFERENCE A", self.C["cyan"]),
+            self.card(2.65, 3.2, "REFERENCE B", self.C["violet"]),
+            self.card(2.65, 3.2, "REFERENCE C", self.C["green"]),
+        ).arrange(RIGHT, buff=.35).move_to([0, 2.2, 0])
 
-        arrow1 = Arrow([-3.5, -0.4, 0], [-0.7, -0.4, 0], color=self.C["cyan"], stroke_width=5)
-        arrow2 = Arrow([0.7, -0.4, 0], [3.5, -0.4, 0], color=self.C["green"], stroke_width=5)
+        # Each reference contains a distinct visual rhythm.
+        for i, r in enumerate(refs):
+            y = r.get_center()[1]
+            x = r.get_center()[0]
+            bars = VGroup(
+                Rectangle(width=.28, height=1.0 + .25*i, fill_opacity=1,
+                          fill_color=[self.C["cyan"], self.C["violet"], self.C["green"]][i],
+                          stroke_width=0),
+                Rectangle(width=.28, height=.55 + .18*i, fill_opacity=1,
+                          fill_color=self.C["white"], stroke_width=0),
+                Rectangle(width=.28, height=.82, fill_opacity=1,
+                          fill_color=self.C["muted"], stroke_width=0),
+            ).arrange(RIGHT, buff=.18).move_to([x, y-.35, 0])
+            r.add(bars)
 
-        play(FadeIn(principle, shift=UP * 0.2), FadeIn(causal_text, shift=UP * 0.2), GrowArrow(arrow1), GrowArrow(arrow2), run_time=0.8)
-        wait_until(27.4)
-
-        # ------------------------------------------------------------------
-        # Beat 8 — 27.4–30.0
-        # "Every movement should explain a relationship."
-        # ------------------------------------------------------------------
-        closing = Text(
-            "Every movement should explain a relationship.",
-            font_size=42,
-            weight=BOLD,
-            color=self.C["white"],
+        arrows = VGroup(
+            Arrow([-3.0, -1.0, 0], [3.0, -1.0, 0], color=self.C["line"], stroke_width=5),
         )
-        closing.set_width(9.4)
-        closing.move_to([0, 6.0, 0])
+        learned = self.card(6.6, 2.0, "LEARNED PATTERN", self.C["green"], self.C["panel2"])
+        learned.move_to([0, -3.2, 0])
+        learned_text = self.txt("STYLE + STRUCTURE + RHYTHM", 25, self.C["green"])
+        learned_text.move_to(learned.get_center())
 
-        chain = VGroup(
-            Text("INPUT", font_size=24, weight=BOLD, color=self.C["muted"]),
-            Text("→", font_size=29, color=self.C["line"]),
-            Text("STRUCTURE", font_size=24, weight=BOLD, color=self.C["white"]),
-            Text("→", font_size=29, color=self.C["line"]),
-            Text("ACTION", font_size=24, weight=BOLD, color=self.C["green"]),
-            Text("→", font_size=29, color=self.C["line"]),
-            Text("RESULT", font_size=24, weight=BOLD, color=self.C["cyan"]),
-        ).arrange(RIGHT, buff=0.18).move_to([0, -2.3, 0])
+        play(
+            FadeOut(ctitle), FadeOut(funnel), FadeOut(constraints), FadeOut(result), FadeOut(result_text),
+            FadeIn(etitle, shift=DOWN*.2), FadeIn(refs, shift=UP*.25), run_time=.85,
+        )
+        play(GrowArrow(arrows[0]), run_time=.45)
+        play(FadeIn(learned, shift=UP*.25), FadeIn(learned_text), run_time=.6)
+        for r in refs:
+            self.flow_dot(r.get_bottom(), learned.get_top(), self.C["green"], .25)
+        wait_until(21.0)
 
-        play(FadeOut(principle), FadeOut(causal_text), FadeOut(arrow1), FadeOut(arrow2), FadeIn(closing, shift=DOWN * 0.2), FadeIn(chain, shift=UP * 0.2), run_time=0.8)
+        # ---------------------------------------------------------------
+        # 21.0–26.0 — ACTION: turn the brief into a decision and result.
+        # ---------------------------------------------------------------
+        atitle = self.txt("Now the system can act.", 40)
+        atitle.move_to([0, 7.25, 0])
 
-        pulse = Dot([-3.9, -2.3, 0], radius=0.11, color=self.C["cyan"])
-        self.add(pulse)
-        play(MoveAlongPath(pulse, Line([-3.9, -2.3, 0], [3.9, -2.3, 0]), rate_func=smooth), run_time=0.9)
-        self.remove(pulse)
+        spec = self.card(8.0, 2.1, "SPECIFICATION", self.C["white"])
+        spec.move_to([0, 4.3, 0])
+        spec_lines = VGroup(
+            self.txt("goal + context + constraints + examples", 23, self.C["white"]),
+            self.txt("→ a sequence of deliberate actions", 23, self.C["green"]),
+        ).arrange(DOWN, buff=.35).move_to(spec.get_center()+DOWN*.1)
 
-        self.camera.frame.animate.set_width(10.0)
-        play(action.animate.scale(1.08), run_time=0.3)
+        actions = VGroup(
+            self.card(2.25, 2.4, "RESEARCH", self.C["blue"]),
+            self.card(2.25, 2.4, "EXPLAIN", self.C["violet"]),
+            self.card(2.25, 2.4, "BUILD", self.C["amber"]),
+        ).arrange(RIGHT, buff=.45).move_to([0, .55, 0])
+
+        result2 = self.card(7.4, 1.65, "RESULT", self.C["green"], self.C["green"])
+        result2.move_to([0, -3.15, 0])
+        result2_text = self.txt("A SPECIFIC, USEFUL OUTPUT", 26, self.C["green"])
+        result2_text.move_to(result2.get_center())
+
+        play(
+            FadeOut(etitle), FadeOut(refs), FadeOut(arrows), FadeOut(learned), FadeOut(learned_text),
+            FadeIn(atitle, shift=DOWN*.2), FadeIn(spec, shift=UP*.2), FadeIn(spec_lines),
+            run_time=.85,
+        )
+        play(FadeIn(actions, shift=UP*.25), run_time=.65)
+        # Selection is visual: research lights, then the output is produced.
+        play(actions[0].animate.scale(1.12), actions[1].animate.set_opacity(.35),
+             actions[2].animate.set_opacity(.35), run_time=.45)
+        self.flow_dot(spec.get_bottom(), actions[0].get_top(), self.C["blue"], .3)
+        play(FadeIn(result2, shift=UP*.2), FadeIn(result2_text), run_time=.55)
+        self.flow_dot(actions[0].get_bottom(), result2.get_top(), self.C["green"], .3)
+        wait_until(26.0)
+
+        # ---------------------------------------------------------------
+        # 26.0–30.0 — HERO ENDING: the result is the visual payoff.
+        # ---------------------------------------------------------------
+        final_kicker = self.txt("THE DIFFERENCE", 21, self.C["muted"])
+        final_kicker.move_to([0, 7.95, 0])
+
+        final = self.txt("Don't animate the words.\nAnimate the idea.", 54)
+        final.set_width(9.1)
+        final.move_to([0, 5.55, 0])
+
+        hero = RoundedRectangle(
+            corner_radius=.25, width=8.7, height=5.6,
+            stroke_color=self.C["cyan"], stroke_width=3,
+            fill_color=self.C["panel"], fill_opacity=1,
+        ).move_to([0, -1.2, 0])
+
+        hero_title = self.txt("INPUT → THINKING → RESULT", 27, self.C["cyan"])
+        hero_title.move_to([0, .85, 0])
+
+        hero_steps = VGroup(
+            self.pill("IDEA", self.C["violet"], 1.55),
+            self.txt("→", 28, self.C["muted"]),
+            self.pill("STRUCTURE", self.C["amber"], 2.05),
+            self.txt("→", 28, self.C["muted"]),
+            self.pill("ACTION", self.C["green"], 1.8),
+        ).arrange(RIGHT, buff=.22).move_to([0, -.55, 0])
+
+        hero_result = RoundedRectangle(
+            corner_radius=.16, width=6.5, height=1.2,
+            stroke_color=self.C["green"], stroke_width=2,
+            fill_color=self.C["green"], fill_opacity=.10,
+        ).move_to([0, -2.45, 0])
+        hero_result_text = self.txt("A RESULT THE VIEWER CAN FEEL.", 24, self.C["green"])
+        hero_result_text.move_to(hero_result.get_center())
+
+        play(
+            FadeOut(atitle), FadeOut(spec), FadeOut(spec_lines), FadeOut(actions),
+            FadeOut(result2), FadeOut(result2_text),
+            FadeIn(final_kicker, shift=DOWN*.2), FadeIn(final, shift=UP*.2),
+            FadeIn(hero, scale=.94), FadeIn(hero_title), FadeIn(hero_steps, shift=UP*.2),
+            run_time=.9,
+        )
+        play(FadeIn(hero_result, shift=UP*.2), FadeIn(hero_result_text), run_time=.55)
+
+        # Camera is part of the final beat, not an afterthought.
+        self.play(self.camera.frame.animate.set_width(9.65), run_time=.55)
+        elapsed += .55
         wait_until(30.0)
