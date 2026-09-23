@@ -6,188 +6,330 @@ config.pixel_width = 1080
 config.pixel_height = 1920
 
 
-class RemotiveV4(Scene):
-    def make_word(self, text, color=WHITE, size=0.62):
-        return Text(text, font_size=int(size * 100), color=color, weight=BOLD)
+class RemotiveV41(MovingCameraScene):
+    """Continuous explanatory animation: the idea changes state instead of changing cards."""
 
-    def construct(self):
-        # 0–4s: hook — words are deliberately scattered, then organized.
-        hook = Text("A good prompt starts as a mess.", font_size=64, weight=BOLD)
-        hook.set_width(8.7)
-        hook.to_edge(UP, buff=1.15)
-        self.play(Write(hook), run_time=1.0)
+    COLORS = {
+        "goal": "#38BDF8",
+        "context": "#A78BFA",
+        "constraints": "#F59E0B",
+        "examples": "#22C55E",
+        "core": "#FFFFFF",
+        "research": "#60A5FA",
+        "explain": "#C084FC",
+        "build": "#FBBF24",
+        "result": "#34D399",
+        "muted": "#64748B",
+    }
 
-        words = VGroup(
-            self.make_word("goal", "#38BDF8").move_to([-2.8, 1.0, 0]),
-            self.make_word("context", "#A78BFA").move_to([2.3, 0.8, 0]),
-            self.make_word("constraints", "#F59E0B").move_to([-1.8, -0.8, 0]),
-            self.make_word("examples", "#22C55E").move_to([2.2, -1.1, 0]),
-            self.make_word("questions", "#FB7185").move_to([0.1, 0.1, 0]),
+    def node(self, label, color, position, radius=0.72, font_size=28):
+        circle = Circle(
+            radius=radius,
+            stroke_color=color,
+            stroke_width=4,
+            fill_color="#0D1016",
+            fill_opacity=1,
         )
-        for mob in words:
-            mob.set_opacity(0)
-        self.play(
-            LaggedStart(*[FadeIn(w, shift=0.35 * UP) for w in words], lag_ratio=0.12),
-            run_time=1.8,
-        )
+        circle.move_to(position)
+        text = Text(label, font_size=font_size, weight=BOLD)
+        text.set_color(color)
+        text.move_to(circle.get_center())
+        return VGroup(circle, text)
 
-        target = VGroup(
-            SurroundingRectangle(
-                VGroup(
-                    words[0].copy().scale(0.78),
-                    words[1].copy().scale(0.78),
-                    words[2].copy().scale(0.78),
-                    words[3].copy().scale(0.78),
-                ),
-                color="#38BDF8",
-                corner_radius=0.18,
-                buff=0.32,
+    def connector(self, a, b, color="#475569", width=3, opacity=0.7):
+        return always_redraw(
+            lambda: Line(
+                a.get_center(),
+                b.get_center(),
+                color=color,
+                stroke_width=width,
+                stroke_opacity=opacity,
             )
         )
-        target[0].move_to([0, -0.1, 0])
-        self.play(
-            words[0].animate.move_to([-1.65, 0.65, 0]).scale(0.78),
-            words[1].animate.move_to([1.65, 0.65, 0]).scale(0.78),
-            words[2].animate.move_to([-1.65, -0.65, 0]).scale(0.78),
-            words[3].animate.move_to([1.65, -0.65, 0]).scale(0.78),
-            words[4].animate.move_to([0, 2.1, 0]).set_opacity(0),
-            run_time=1.3,
-        )
-        self.play(Create(target[0]), run_time=0.7)
-        self.wait(1.0)
 
-        # 4–11s: transform the idea into a structured plan.
-        plan_title = Text("STRUCTURE", font_size=48, color="#38BDF8", weight=BOLD)
-        plan_title.move_to([0, 3.25, 0])
+    def pulse(self, position, color):
+        return Dot(point=position, radius=0.10, color=color)
+
+    def construct(self):
+        # The portrait frame is intentionally used as a tall visual field.
+        self.camera.frame.set_width(10.0)
+
+        # ------------------------------------------------------------------
+        # 0–5s — A messy input: pieces exist independently.
+        # ------------------------------------------------------------------
+        eyebrow = Text("THE INPUT", font_size=26, weight=BOLD, color="#94A3B8")
+        eyebrow.move_to([0, 8.7, 0])
+
+        hook = Text("A prompt is not a sentence.", font_size=58, weight=BOLD)
+        hook.set_width(8.8)
+        hook.move_to([0, 7.45, 0])
+
+        sub = Text("It is a system.", font_size=44, weight=BOLD, color="#CBD5E1")
+        sub.move_to([0, 6.55, 0])
+
+        goal = self.node("GOAL", self.COLORS["goal"], [-3.5, 3.2, 0], 0.82, 25)
+        context = self.node("CONTEXT", self.COLORS["context"], [3.2, 2.4, 0], 0.90, 23)
+        constraints = self.node("LIMITS", self.COLORS["constraints"], [-2.6, 0.2, 0], 0.86, 23)
+        examples = self.node("EXAMPLES", self.COLORS["examples"], [3.0, -0.6, 0], 0.90, 21)
+
+        for mob in [goal, context, constraints, examples]:
+            mob.set_opacity(0)
+
+        self.play(FadeIn(eyebrow, shift=DOWN * 0.2), Write(hook), FadeIn(sub, shift=UP * 0.2), run_time=1.25)
         self.play(
-            FadeOut(hook, shift=UP * 0.25),
-            Transform(target[0], SurroundingRectangle(
-                VGroup(words[0], words[1], words[2], words[3]),
-                color="#38BDF8",
-                corner_radius=0.18,
-                buff=0.30,
-            )),
-            FadeIn(plan_title, shift=DOWN * 0.25),
+            LaggedStart(
+                *[FadeIn(m, shift=0.35 * UP) for m in [goal, context, constraints, examples]],
+                lag_ratio=0.16,
+            ),
+            run_time=2.0,
+        )
+
+        loose_links = VGroup(
+            self.connector(goal, context, "#334155", 2, 0.35),
+            self.connector(context, examples, "#334155", 2, 0.35),
+            self.connector(examples, constraints, "#334155", 2, 0.35),
+        )
+        self.play(Create(loose_links), run_time=0.65)
+        self.wait(1.10)
+
+        # ------------------------------------------------------------------
+        # 5–11s — The pieces connect into a specification.
+        # ------------------------------------------------------------------
+        self.play(
+            FadeOut(hook, shift=UP * 0.35),
+            FadeOut(sub, shift=UP * 0.2),
+            eyebrow.animate.move_to([0, 8.6, 0]),
+            run_time=0.6,
+        )
+
+        center = self.node("SPEC", self.COLORS["core"], [0, 1.65, 0], 1.05, 29)
+        center.set_opacity(0)
+
+        target_positions = {
+            goal: [-3.15, 3.55, 0],
+            context: [3.15, 3.55, 0],
+            constraints: [-3.15, -0.45, 0],
+            examples: [3.15, -0.45, 0],
+        }
+
+        self.play(FadeIn(center, scale=0.7), run_time=0.45)
+        self.play(
+            *[
+                mob.animate.move_to(pos).scale(0.92)
+                for mob, pos in target_positions.items()
+            ],
+            run_time=1.15,
+        )
+        self.play(FadeOut(loose_links), run_time=0.25)
+
+        links = VGroup(
+            self.connector(goal, center, self.COLORS["goal"], 4, 0.82),
+            self.connector(context, center, self.COLORS["context"], 4, 0.82),
+            self.connector(constraints, center, self.COLORS["constraints"], 4, 0.82),
+            self.connector(examples, center, self.COLORS["examples"], 4, 0.82),
+        )
+        self.play(Create(links), run_time=0.9)
+
+        flow = self.pulse(goal.get_center(), self.COLORS["goal"])
+        self.add(flow)
+        self.play(MoveAlongPath(flow, Line(goal.get_center(), center.get_center()), rate_func=smooth), run_time=0.65)
+        self.play(MoveAlongPath(flow, Line(context.get_center(), center.get_center()), rate_func=smooth), run_time=0.65)
+        self.play(MoveAlongPath(flow, Line(constraints.get_center(), center.get_center()), rate_func=smooth), run_time=0.65)
+        self.play(MoveAlongPath(flow, Line(examples.get_center(), center.get_center()), rate_func=smooth), run_time=0.65)
+        self.remove(flow)
+
+        label = Text("CONNECTED", font_size=27, weight=BOLD, color="#E2E8F0")
+        label.move_to([0, -2.25, 0])
+        self.play(FadeIn(label, shift=UP * 0.25), run_time=0.45)
+        self.wait(0.80)
+
+        # ------------------------------------------------------------------
+        # 11–17s — The specification branches into possible actions.
+        # ------------------------------------------------------------------
+        self.play(
+            label.animate.move_to([0, 7.1, 0]).scale(0.82),
+            self.camera.frame.animate.set_width(11.5),
+            run_time=0.8,
+        )
+
+        action_research = self.node("RESEARCH", self.COLORS["research"], [-3.45, -1.3, 0], 0.95, 21)
+        action_explain = self.node("EXPLAIN", self.COLORS["explain"], [0, -3.4, 0], 0.90, 23)
+        action_build = self.node("BUILD", self.COLORS["build"], [3.45, -1.3, 0], 0.88, 24)
+
+        branch_links = VGroup(
+            self.connector(center, action_research, self.COLORS["research"], 4, 0.8),
+            self.connector(center, action_explain, self.COLORS["explain"], 4, 0.8),
+            self.connector(center, action_build, self.COLORS["build"], 4, 0.8),
+        )
+
+        question = Text("WHAT DOES THE USER NEED NEXT?", font_size=27, weight=BOLD, color="#94A3B8")
+        question.move_to([0, 5.75, 0])
+
+        self.play(FadeIn(question, shift=DOWN * 0.2), run_time=0.4)
+        self.play(
+            LaggedStart(
+                FadeIn(action_research, shift=0.4 * UP),
+                FadeIn(action_explain, shift=0.4 * UP),
+                FadeIn(action_build, shift=0.4 * UP),
+                lag_ratio=0.18,
+            ),
+            run_time=1.0,
+        )
+        self.play(Create(branch_links), run_time=0.8)
+
+        selector = self.pulse(center.get_center(), "#FFFFFF")
+        self.add(selector)
+        self.play(MoveAlongPath(selector, Line(center.get_center(), action_research.get_center()), rate_func=smooth), run_time=0.9)
+        self.remove(selector)
+
+        research_ring = Circle(radius=1.24, color=self.COLORS["research"], stroke_width=6)
+        research_ring.move_to(action_research.get_center())
+        self.play(Create(research_ring), action_research.animate.scale(1.12), run_time=0.65)
+
+        evidence = VGroup(
+            Dot([-2.9, -4.25, 0], radius=0.16, color="#93C5FD"),
+            Dot([-1.95, -4.75, 0], radius=0.16, color="#BFDBFE"),
+            Dot([-1.05, -4.25, 0], radius=0.16, color="#60A5FA"),
+        )
+        evidence_label = Text("EVIDENCE", font_size=24, weight=BOLD, color="#BFDBFE")
+        evidence_label.move_to([-1.95, -5.25, 0])
+
+        self.play(
+            LaggedStart(*[FadeIn(d, scale=0.2) for d in evidence], lag_ratio=0.18),
+            FadeIn(evidence_label, shift=UP * 0.2),
             run_time=0.9,
         )
 
-        steps = VGroup(
-            Text("1. Define the goal", font_size=43),
-            Text("2. Add the context", font_size=43),
-            Text("3. Set the constraints", font_size=43),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.34)
-        steps.set_width(8.2)
-        steps.move_to([0, -0.15, 0])
+        evidence_links = VGroup(
+            Line(action_research.get_center(), evidence[0].get_center(), color="#60A5FA", stroke_width=3),
+            Line(action_research.get_center(), evidence[1].get_center(), color="#60A5FA", stroke_width=3),
+            Line(action_research.get_center(), evidence[2].get_center(), color="#60A5FA", stroke_width=3),
+        )
+        self.play(Create(evidence_links), run_time=0.5)
+        self.wait(0.70)
+
+        # ------------------------------------------------------------------
+        # 17–24s — Evidence transforms into an artifact, not another card.
+        # ------------------------------------------------------------------
+        self.play(
+            FadeOut(question, shift=UP * 0.25),
+            FadeOut(label, shift=UP * 0.2),
+            FadeOut(branch_links),
+            FadeOut(research_ring),
+            FadeOut(action_explain),
+            FadeOut(action_build),
+            FadeOut(context),
+            FadeOut(constraints),
+            FadeOut(examples),
+            run_time=0.75,
+        )
+
+        # Move the remaining causal chain upward before the transformation.
+        self.play(
+            center.animate.move_to([0, 4.5, 0]).scale(0.82),
+            goal.animate.move_to([-3.6, 2.6, 0]).scale(0.78),
+            evidence.animate.shift(DOWN * 0.1),
+            evidence_label.animate.shift(DOWN * 0.1),
+            run_time=0.75,
+        )
+
+        artifact_title = Text("FROM EVIDENCE TO ACTION", font_size=31, weight=BOLD, color="#CBD5E1")
+        artifact_title.move_to([0, 7.0, 0])
+
+        action = self.node("ACTION", self.COLORS["result"], [0, -1.5, 0], 1.05, 27)
+        action.set_opacity(0)
+
+        action_lines = VGroup(
+            Text("compare", font_size=28, color="#A7F3D0"),
+            Text("decide", font_size=28, color="#A7F3D0"),
+            Text("build", font_size=28, color="#A7F3D0"),
+        ).arrange(RIGHT, buff=0.55)
+        action_lines.move_to([0, -3.45, 0])
+        action_lines.set_opacity(0)
+
+        self.play(FadeIn(artifact_title, shift=DOWN * 0.2), run_time=0.4)
+        self.play(
+            evidence[0].animate.move_to([-1.25, -0.25, 0]),
+            evidence[1].animate.move_to([0, 0.35, 0]),
+            evidence[2].animate.move_to([1.25, -0.25, 0]),
+            evidence_label.animate.move_to([0, 1.25, 0]),
+            run_time=0.9,
+        )
+
+        result_links = VGroup(
+            Line(evidence[0].get_center(), action.get_center(), color=self.COLORS["result"], stroke_width=3),
+            Line(evidence[1].get_center(), action.get_center(), color=self.COLORS["result"], stroke_width=3),
+            Line(evidence[2].get_center(), action.get_center(), color=self.COLORS["result"], stroke_width=3),
+        )
+        self.play(FadeIn(action), Create(result_links), run_time=0.85)
+        self.play(
+            FadeIn(action_lines, shift=UP * 0.3),
+            action.animate.scale(1.10),
+            run_time=0.75,
+        )
+
+        # The original pieces become a small provenance trail.
+        provenance = VGroup(
+            Text("GOAL", font_size=20, color=self.COLORS["goal"], weight=BOLD),
+            Text("→", font_size=24, color="#64748B"),
+            Text("SPEC", font_size=20, color="#E2E8F0", weight=BOLD),
+            Text("→", font_size=24, color="#64748B"),
+            Text("EVIDENCE", font_size=20, color="#93C5FD", weight=BOLD),
+            Text("→", font_size=24, color="#64748B"),
+            Text("ACTION", font_size=20, color=self.COLORS["result"], weight=BOLD),
+        ).arrange(RIGHT, buff=0.16)
+        provenance.move_to([0, 6.15, 0])
+
+        self.play(FadeIn(provenance, shift=DOWN * 0.2), run_time=0.45)
+        self.wait(0.95)
+
+        # ------------------------------------------------------------------
+        # 24–30s — Pull back: one connected system, one causal story.
+        # ------------------------------------------------------------------
+        self.play(
+            self.camera.frame.animate.set_width(14.0).move_to([0, 0.2, 0]),
+            run_time=1.25,
+        )
+
+        all_chain = VGroup(
+            Text("INPUT", font_size=25, weight=BOLD, color="#94A3B8"),
+            Text("→", font_size=30, color="#64748B"),
+            Text("STRUCTURE", font_size=25, weight=BOLD, color="#E2E8F0"),
+            Text("→", font_size=30, color="#64748B"),
+            Text("ACTION", font_size=25, weight=BOLD, color=self.COLORS["result"]),
+            Text("→", font_size=30, color="#64748B"),
+            Text("RESULT", font_size=25, weight=BOLD, color="#F0FDFA"),
+        ).arrange(RIGHT, buff=0.18)
+        all_chain.move_to([0, -7.5, 0])
+
+        closing = Text(
+            "Every movement should explain a relationship.",
+            font_size=42,
+            weight=BOLD,
+        )
+        closing.set_width(9.8)
+        closing.move_to([0, 8.0, 0])
+
+        self.play(FadeIn(all_chain, shift=UP * 0.25), FadeIn(closing, shift=DOWN * 0.25), run_time=0.8)
+
+        flow_dot = self.pulse(goal.get_center(), self.COLORS["goal"])
+        self.add(flow_dot)
+        self.play(
+            MoveAlongPath(flow_dot, Line(goal.get_center(), center.get_center()), rate_func=smooth),
+            run_time=0.55,
+        )
+        self.play(
+            MoveAlongPath(flow_dot, Line(center.get_center(), evidence[1].get_center()), rate_func=smooth),
+            run_time=0.55,
+        )
+        self.play(
+            MoveAlongPath(flow_dot, Line(evidence[1].get_center(), action.get_center()), rate_func=smooth),
+            run_time=0.55,
+        )
+        self.remove(flow_dot)
 
         self.play(
-            LaggedStart(
-                *[TransformFromCopy(words[i], steps[j]) for j, i in enumerate([0, 1, 2])],
-                lag_ratio=0.28,
-            ),
-            run_time=2.6,
+            action.animate.scale(1.08),
+            run_time=0.6,
         )
-
-        arrow = Arrow(
-            start=[0, -2.0, 0],
-            end=[0, -2.85, 0],
-            color="#38BDF8",
-            stroke_width=5,
-        )
-        result = Text("NOW IT CAN ACT", font_size=54, color=WHITE, weight=BOLD)
-        result.move_to([0, -3.35, 0])
-        self.play(GrowArrow(arrow), FadeIn(result, shift=UP * 0.2), run_time=1.0)
-        self.wait(2.5)
-
-        # 11–18s: camera-like reframing and transformation into output.
-        frame_box = RoundedRectangle(
-            width=8.7, height=4.2, corner_radius=0.25,
-            stroke_color="#A78BFA", stroke_width=3,
-            fill_color="#11111A", fill_opacity=0.92,
-        )
-        frame_box.move_to([0, 0.0, 0])
-        header = Text("RESEARCH PLAN", font_size=42, color="#A78BFA", weight=BOLD)
-        header.move_to([0, 1.45, 0])
-        bullets = VGroup(
-            Text("Compare options", font_size=35),
-            Text("Find missing evidence", font_size=35),
-            Text("Choose the next action", font_size=35),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.28)
-        bullets.move_to([0, -0.2, 0])
-        check = VGroup(*[
-            Circle(radius=0.10, color="#22C55E", fill_opacity=1).next_to(b, LEFT, buff=0.25)
-            for b in bullets
-        ])
-
-        self.play(
-            FadeOut(VGroup(target, plan_title, steps, arrow, result), shift=DOWN * 0.2),
-            Create(frame_box),
-            FadeIn(header, shift=UP * 0.25),
-            run_time=1.0,
-        )
-        self.play(
-            LaggedStart(
-                *[FadeIn(m, shift=RIGHT * 0.3) for m in bullets],
-                lag_ratio=0.18,
-            ),
-            LaggedStart(
-                *[Create(c) for c in check],
-                lag_ratio=0.18,
-            ),
-            run_time=2.4,
-        )
-        self.wait(4.0)
-
-        # 18–24s: transform plan into a concrete artifact.
-        code_box = RoundedRectangle(
-            width=9.0, height=4.6, corner_radius=0.25,
-            stroke_color="#F59E0B", stroke_width=3,
-            fill_color="#0D0E12", fill_opacity=0.96,
-        )
-        code_header = Text("WORKING DRAFT", font_size=42, color="#F59E0B", weight=BOLD)
-        code_header.move_to([0, 1.55, 0])
-        code = VGroup(
-            Text("input  →  plan", font_size=34, font="DejaVu Sans Mono"),
-            Text("plan   →  draft", font_size=34, font="DejaVu Sans Mono"),
-            Text("draft  →  result", font_size=34, font="DejaVu Sans Mono"),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.32)
-        code.move_to([0, -0.25, 0])
-
-        self.play(
-            Transform(frame_box, code_box),
-            Transform(header, code_header),
-            Transform(bullets, code),
-            FadeOut(check),
-            run_time=1.4,
-        )
-        self.wait(2.5)
-
-        # 24–30s: pull back and reveal the whole pipeline.
-        pipeline = VGroup(
-            Text("MESS", font_size=42, color="#FB7185", weight=BOLD),
-            Text("→", font_size=48),
-            Text("STRUCTURE", font_size=42, color="#38BDF8", weight=BOLD),
-            Text("→", font_size=48),
-            Text("DRAFT", font_size=42, color="#F59E0B", weight=BOLD),
-            Text("→", font_size=48),
-            Text("RESULT", font_size=42, color="#22C55E", weight=BOLD),
-        ).arrange(RIGHT, buff=0.20)
-        pipeline.set_width(10.0)
-        pipeline.move_to([0, -2.9, 0])
-
-        caption = Text("The visual should explain the idea — not decorate it.", font_size=40)
-        caption.set_width(9.3)
-        caption.move_to([0, 3.0, 0])
-
-        self.play(
-            FadeOut(code_header),
-            FadeOut(code),
-            FadeOut(frame_box),
-            FadeIn(pipeline, shift=UP * 0.3),
-            FadeIn(caption, shift=DOWN * 0.3),
-            run_time=1.2,
-        )
-        self.play(
-            pipeline.animate.scale(1.08),
-            run_time=0.8,
-        )
-        self.wait(3.9)
+        self.wait(1.55)
