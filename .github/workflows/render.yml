@@ -28,16 +28,16 @@ jobs:
         run: |
           mkdir -p public
           python -m piper.download_voices --data-dir public en_US-lessac-high
-          printf '%s\n' "Three things ChatGPT can do that most people don't know. Let's get into it." | python -m piper -m en_US-lessac-high --data-dir public -f scene1.wav --length_scale 0.92
-          printf '%s\n' "First: research. Give ChatGPT a messy question. It can turn it into a clear plan, compare options, and find gaps." | python -m piper -m en_US-lessac-high --data-dir public -f scene2.wav --length_scale 0.92
-          printf '%s\n' "Second: understand. Give it a hard idea, then ask it to explain that idea at your level." | python -m piper -m en_US-lessac-high --data-dir public -f scene3.wav --length_scale 0.92
-          printf '%s\n' "Third: build. Turn a rough idea into code, scripts, checklists, or workflows. Start with the outcome, not the tools." | python -m piper -m en_US-lessac-high --data-dir public -f scene4.wav --length_scale 0.92
-          ffmpeg -y -i scene1.wav -i scene2.wav -i scene3.wav -i scene4.wav -filter_complex "[0:a]apad=pad_dur=6,atrim=0:6[a0];[1:a]apad=pad_dur=8,atrim=0:8[a1];[2:a]apad=pad_dur=8,atrim=0:8[a2];[3:a]apad=pad_dur=8,atrim=0:8[a3];[a0][a1][a2][a3]concat=n=4:v=0:a=1[a]" -map "[a]" -t 30 -ar 22050 -ac 1 public/voice.wav
+          printf '%s\n' "Three things ChatGPT can do that most people don't know. Let's get into it." | python -m piper -m en_US-lessac-high --data-dir public -f scene1.wav --length_scale 0.86
+          printf '%s\n' "First: research. Give ChatGPT a messy question. It can turn it into a clear plan, compare options, and find gaps." | python -m piper -m en_US-lessac-high --data-dir public -f scene2.wav --length_scale 0.86
+          printf '%s\n' "Second: understand. Give it a hard idea, then ask it to explain that idea at your level." | python -m piper -m en_US-lessac-high --data-dir public -f scene3.wav --length_scale 0.86
+          printf '%s\n' "Third: build. Turn a rough idea into code, scripts, checklists, or workflows. Start with the outcome, not the tools." | python -m piper -m en_US-lessac-high --data-dir public -f scene4.wav --length_scale 0.86
+          ffmpeg -y -i scene1.wav -i scene2.wav -i scene3.wav -i scene4.wav -filter_complex "[0:a]silenceremove=stop_periods=-1:stop_duration=0.22:stop_threshold=-42dB,apad=pad_dur=2.5,atrim=0:6[a0];[1:a]silenceremove=stop_periods=-1:stop_duration=0.22:stop_threshold=-42dB,apad=pad_dur=2.5,atrim=0:8[a1];[2:a]silenceremove=stop_periods=-1:stop_duration=0.22:stop_threshold=-42dB,apad=pad_dur=2.5,atrim=0:8[a2];[3:a]silenceremove=stop_periods=-1:stop_duration=0.22:stop_threshold=-42dB,apad=pad_dur=2.5,atrim=0:8[a3];[a0][a1][a2][a3]concat=n=4:v=0:a=1[a]" -map "[a]" -t 30 -ar 22050 -ac 1 public/voice.wav
       - name: Render video
         run: npm run render
       - name: Upload MP4
         uses: actions/upload-artifact@v4
         with:
-          name: remotive-video-studio-30s-voice
+          name: remotive-video-studio-30s-voice-v2
           path: out/main.mp4
           if-no-files-found: error
