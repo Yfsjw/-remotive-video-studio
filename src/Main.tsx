@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 
 const scenes = [
   {start: 0, end: 180, kicker: 'MOST PEOPLE DON’T KNOW', title: ['3 things', 'ChatGPT can do'], sub: 'that feel almost like magic.'},
@@ -25,20 +25,18 @@ export const Main: React.FC = () => {
 
   return (
     <AbsoluteFill style={{background: '#050505', color: '#fff', fontFamily: 'Arial, Helvetica, sans-serif', overflow: 'hidden'}}>
+      <Audio src={staticFile('voice.wav')} volume={0.95} />
       <AbsoluteFill style={{background: 'radial-gradient(circle at 78% 18%, rgba(255,255,255,0.12), transparent 28%), radial-gradient(circle at 15% 80%, rgba(120,120,120,0.08), transparent 30%)'}} />
-
       <div style={{position: 'absolute', top: 82, left: 72, right: 72, display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity}}>
         <div style={{fontSize: 28, fontWeight: 800, letterSpacing: 4}}>AI / 2026</div>
         <div style={{fontSize: 24, fontWeight: 700, letterSpacing: 2, opacity: 0.55}}>{number}</div>
       </div>
-
       <div style={{position: 'absolute', top: '38%', left: 72, right: 72, transform: 'translateY(' + translateY + 'px) scale(' + scale + ')', transformOrigin: 'left center', opacity}}>
         <div style={{fontSize: 27, fontWeight: 800, letterSpacing: 5, marginBottom: 30, opacity: 0.58}}>{scene.kicker}</div>
         <div style={{fontSize: sceneIndex === 0 ? 92 : 76, lineHeight: 1.02, fontWeight: 900, letterSpacing: -2, maxWidth: 930}}>
           {scene.title.map((line) => <div key={line}>{line}</div>)}
         </div>
         <div style={{marginTop: 42, maxWidth: 820, fontSize: 34, lineHeight: 1.35, fontWeight: 500, opacity: 0.66}}>{scene.sub}</div>
-
         {sceneIndex === 0 && (
           <div style={{marginTop: 54, display: 'inline-flex', alignItems: 'center', gap: 18}}>
             <div style={{width: 68, height: 68, borderRadius: 34, border: '2px solid rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28}}>→</div>
@@ -46,13 +44,11 @@ export const Main: React.FC = () => {
           </div>
         )}
       </div>
-
       {sceneIndex > 0 && (
         <div style={{position: 'absolute', right: 72, top: '38%', width: 150, height: 150, borderRadius: 75, border: '1px solid rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: opacity * 0.9}}>
           <div style={{fontSize: 62, fontWeight: 900, opacity: 0.18}}>{number}</div>
         </div>
       )}
-
       <div style={{position: 'absolute', bottom: 88, left: 72, right: 72, height: 4, background: 'rgba(255,255,255,0.12)'}}>
         <div style={{width: progress + '%', height: '100%', background: '#fff'}} />
       </div>
