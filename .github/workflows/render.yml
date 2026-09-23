@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - visual-engine-v9
+      - visual-asset-intelligence-v1
       - main
 
 jobs:
@@ -13,21 +14,45 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install FFmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Install dependencies
         run: |
           npm install
           python -m pip install --upgrade pip
           python -m pip install piper-tts
+
+      - name: Retrieve and validate real visual assets
+        run: |
+          python scripts/retrieve_assets.py
+          for f in public/assets/scene*.png; do
+            [ -e "$f" ] || continue
+            base="${f%.png}"
+            ffmpeg -y -loglevel error -i "$f" -q:v 2 "${base}.jpg"
+            rm "$f"
+          done
+          python - <<'PY'
+          import json, os
+          p='public/assets/manifest.json'
+          data=json.load(open(p))
+          for x in data:
+              x['render_path']=x['path'].rsplit('.',1)[0]+'.jpg'
+          json.dump(data,open(p,'w'),ensure_ascii=False,indent=2)
+          print(json.dumps(data,ensure_ascii=False,indent=2))
+          PY
+
       - name: Generate natural US English voice
         run: |
           mkdir -p public
@@ -37,16 +62,25 @@ jobs:
           printf '%s\n' "Second: understand. Give it a difficult idea. Then ask it to teach that idea at your level, with examples and simpler language." | python -m piper -m en_US-lessac-high --data-dir public -f scene3.wav --length_scale 0.86
           printf '%s\n' "Third: build. Give it a rough outcome, and it can turn that idea into code, scripts, checklists, or a first draft. Start with the result, not the tool." | python -m piper -m en_US-lessac-high --data-dir public -f scene4.wav --length_scale 0.86
           ffmpeg -y -i scene1.wav -i scene2.wav -i scene3.wav -i scene4.wav -filter_complex "[0:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:5.50[a0];[1:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:9.25[a1];[2:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:6.50[a2];[3:a]silenceremove=start_periods=1:start_duration=0.06:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=0.25,atrim=0:8.75[a3];[a0][a1][a2][a3]concat=n=4:v=0:a=1,atrim=0:30[a]" -map "[a]" -ar 22050 -ac 1 public/voice.wav
+
       - name: Render video
         run: npm run render
+
       - name: Verify output
         run: |
           test -s out/main.mp4
+          test -s public/assets/scene01.jpg
+          test -s public/assets/scene02.jpg
+          test -s public/assets/scene03.jpg
+          test -s public/assets/scene04.jpg
           ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,codec_name -of default=nw=1 out/main.mp4
           ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate -of default=nw=1 out/main.mp4
-      - name: Upload MP4
+
+      - name: Upload MP4 and asset manifest
         uses: actions/upload-artifact@v4
         with:
-          name: remotive-v9-visual-engine
-          path: out/main.mp4
+          name: visual-asset-intelligence-v1
+          path: |
+            out/main.mp4
+            public/assets/manifest.json
           if-no-files-found: error
