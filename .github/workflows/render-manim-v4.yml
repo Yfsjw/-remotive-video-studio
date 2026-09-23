@@ -1,10 +1,10 @@
-name: Render Manim V4.1 Explanatory
+name: Render Manim V4.2 Sync Male
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - manim-v4-1-explanatory
+      - manim-v4-2-sync-male
 
 jobs:
   render-manim:
@@ -28,28 +28,87 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install manim piper-tts
 
-      - name: Generate voice
+      - name: Generate synchronized male narration
+        shell: bash
         run: |
-          mkdir -p public out
-          python -m piper.download_voices --data-dir public en_US-lessac-high
-          printf '%s\n' "A prompt is not a sentence. It is a system. You start with a goal, context, constraints, and examples. When those pieces connect, the prompt stops being a pile of words and becomes a usable specification. That structure determines what happens next: research, explanation, or building. And the plan can keep transforming until it becomes a real result. The important part is not decoration. Every movement should explain a relationship." | python -m piper -m en_US-lessac-high --data-dir public -f public/voice.wav --length_scale 0.84
-          ffmpeg -y -i public/voice.wav -af "apad=whole_dur=30,atrim=0:30" -ar 22050 -ac 1 public/voice-30s.wav
+          set -euo pipefail
+          mkdir -p public/voice_segments out
+          python -m piper.download_voices --data-dir public en_US-ryan-medium
 
-      - name: Render Manim V4.1
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          sentences = [
+              ("01", "A prompt is not a sentence.", 2.6),
+              ("02", "It is a system.", 1.7),
+              ("03", "You start with a goal, context, constraints, and examples.", 3.9),
+              ("04", "When those pieces connect, the prompt stops being a pile of words and becomes a usable specification.", 7.2),
+              ("05", "That structure determines what happens next: research, explanation, or building.", 4.3),
+              ("06", "And the plan can keep transforming until it becomes a real result.", 5.2),
+              ("07", "The important part is not decoration.", 2.5),
+              ("08", "Every movement should explain a relationship.", 2.6),
+          ]
+
+          root = Path("public/voice_segments")
+          concat = root / "concat.txt"
+          lines = []
+
+          for idx, text, target in sentences:
+              raw = root / f"{idx}-raw.wav"
+              padded = root / f"{idx}.wav"
+              subprocess.run(
+                  [
+                      "python", "-m", "piper",
+                      "-m", "en_US-ryan-medium",
+                      "--data-dir", "public",
+                      "--length_scale", "0.90",
+                      "-f", str(raw),
+                  ],
+                  input=text + "\n",
+                  text=True,
+                  check=True,
+              )
+              subprocess.run(
+                  [
+                      "ffmpeg", "-y", "-i", str(raw),
+                      "-af", f"apad=whole_dur={target:.3f},atrim=0:{target:.3f}",
+                      "-ar", "22050", "-ac", "1",
+                      str(padded),
+                  ],
+                  check=True,
+                  stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
+              )
+              lines.append(f"file '{padded.resolve()}'")
+
+          concat.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+          ffmpeg -y -f concat -safe 0 -i public/voice_segments/concat.txt -c copy public/voice.wav
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 public/voice.wav)
+          python -c "d=float('$DURATION'); assert 29.5 <= d <= 30.1, f'Unexpected narration duration: {d:.3f}s'; print(f'Narration duration: {d:.3f}s')"
+
+      - name: Render Manim V4.2
         run: |
-          manim -r 1080,1920 --fps 30 --format mp4 -o remotive-v4-1 manim/main.py RemotiveV41
-          VIDEO=$(find media -type f -name 'remotive-v4-1.mp4' | head -n 1)
+          manim -r 1080,1920 --fps 30 --format mp4 -o remotive-v4-2 manim/main.py RemotiveV42
+          VIDEO=$(find media -type f -name 'remotive-v4-2.mp4' | head -n 1)
           test -n "$VIDEO"
-          ffmpeg -y -i "$VIDEO" -i public/voice-30s.wav -map 0:v:0 -map 1:a:0 -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 128k -shortest out/remotive-v4-1-manim.mp4
+          ffmpeg -y -i "$VIDEO" -i public/voice.wav             -map 0:v:0 -map 1:a:0             -c:v libx264 -pix_fmt yuv420p             -c:a aac -b:a 128k             -t 30             out/remotive-v4-2-sync-male.mp4
 
-      - name: Validate output duration
+      - name: Validate output
         run: |
-          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 out/remotive-v4-1-manim.mp4)
-          python -c "d=float('$DURATION'); assert d >= 29.5, f'Video too short: {d:.2f}s'; print(f'Validated duration: {d:.2f}s')"
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 out/remotive-v4-2-sync-male.mp4)
+          AUDIO=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 out/remotive-v4-2-sync-male.mp4)
+          VIDEO=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 out/remotive-v4-2-sync-male.mp4)
+          python -c "d=float('$DURATION'); assert 29.5 <= d <= 30.1, f'Video duration invalid: {d:.3f}s'; print(f'Validated duration: {d:.3f}s')"
+          test "$VIDEO" = "h264"
+          test "$AUDIO" = "aac"
+          echo "Validated H.264 video + AAC audio"
 
       - name: Upload MP4
         uses: actions/upload-artifact@v4
         with:
-          name: remotive-video-studio-manim-v4-1
-          path: out/remotive-v4-1-manim.mp4
+          name: remotive-video-studio-manim-v4-2-sync-male
+          path: out/remotive-v4-2-sync-male.mp4
           if-no-files-found: error
