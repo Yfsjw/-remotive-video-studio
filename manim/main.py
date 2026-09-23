@@ -1,336 +1,364 @@
 from manim import *
 
-config.background_color = "#07070A"
+config.background_color = "#05070B"
 config.frame_rate = 30
 config.pixel_width = 1080
 config.pixel_height = 1920
 
 
-class RemotiveV41(MovingCameraScene):
-    """Continuous explanatory animation: the idea changes state instead of changing cards."""
+class RemotiveV42(MovingCameraScene):
+    """
+    V4.2: narration-driven explanatory animation.
+    The visual beats are locked to the eight narration beats rendered by CI.
+    """
 
-    COLORS = {
-        "goal": "#38BDF8",
-        "context": "#A78BFA",
-        "constraints": "#F59E0B",
-        "examples": "#22C55E",
-        "core": "#FFFFFF",
-        "research": "#60A5FA",
-        "explain": "#C084FC",
-        "build": "#FBBF24",
-        "result": "#34D399",
-        "muted": "#64748B",
+    C = {
+        "cyan": "#38BDF8",
+        "violet": "#A78BFA",
+        "amber": "#F59E0B",
+        "green": "#34D399",
+        "blue": "#60A5FA",
+        "white": "#F8FAFC",
+        "muted": "#94A3B8",
+        "line": "#334155",
+        "panel": "#0B111A",
     }
 
-    def node(self, label, color, position, radius=0.72, font_size=28):
-        circle = Circle(
+    BEATS = [0.0, 2.6, 4.3, 8.2, 15.4, 19.7, 24.9, 27.4, 30.0]
+
+    def node(self, label, color, point, radius=0.62, size=24):
+        c = Circle(
             radius=radius,
             stroke_color=color,
             stroke_width=4,
-            fill_color="#0D1016",
+            fill_color=self.C["panel"],
             fill_opacity=1,
-        )
-        circle.move_to(position)
-        text = Text(label, font_size=font_size, weight=BOLD)
-        text.set_color(color)
-        text.move_to(circle.get_center())
-        return VGroup(circle, text)
+        ).move_to(point)
+        t = Text(label, font_size=size, weight=BOLD, color=color).move_to(point)
+        return VGroup(c, t)
 
-    def connector(self, a, b, color="#475569", width=3, opacity=0.7):
-        return always_redraw(
-            lambda: Line(
-                a.get_center(),
-                b.get_center(),
-                color=color,
-                stroke_width=width,
-                stroke_opacity=opacity,
-            )
+    def link(self, a, b, color=None, width=3, opacity=0.72):
+        return Line(
+            a.get_center(),
+            b.get_center(),
+            color=color or self.C["line"],
+            stroke_width=width,
+            stroke_opacity=opacity,
         )
 
-    def pulse(self, position, color):
-        return Dot(point=position, radius=0.10, color=color)
+    def dot_flow(self, a, b, color):
+        d = Dot(a.get_center(), radius=0.09, color=color)
+        self.play(MoveAlongPath(d, Line(a.get_center(), b.get_center()), rate_func=smooth), run_time=0.38)
+        self.remove(d)
+
+    def caption(self, text, color=None):
+        t = Text(
+            text,
+            font_size=23,
+            weight=BOLD,
+            color=color or self.C["muted"],
+        )
+        t.set_width(9.0)
+        t.move_to([0, -8.25, 0])
+        return t
 
     def construct(self):
-        # The portrait frame is intentionally used as a tall visual field.
-        self.camera.frame.set_width(10.0)
+        self.camera.frame.set_width(10.5)
+        elapsed = 0.0
+
+        def play(*anims, run_time):
+            nonlocal elapsed
+            self.play(*anims, run_time=run_time)
+            elapsed += run_time
+
+        def wait_until(target):
+            nonlocal elapsed
+            gap = target - elapsed
+            if gap > 0:
+                self.wait(gap)
+                elapsed = target
 
         # ------------------------------------------------------------------
-        # 0–5s — A messy input: pieces exist independently.
+        # Beat 1 — 0.0–2.6
+        # "A prompt is not a sentence."
         # ------------------------------------------------------------------
-        eyebrow = Text("THE INPUT", font_size=26, weight=BOLD, color="#94A3B8")
-        eyebrow.move_to([0, 8.7, 0])
+        kicker = Text("THE PROBLEM", font_size=24, weight=BOLD, color=self.C["muted"])
+        kicker.move_to([0, 7.9, 0])
 
-        hook = Text("A prompt is not a sentence.", font_size=58, weight=BOLD)
-        hook.set_width(8.8)
-        hook.move_to([0, 7.45, 0])
+        hook = Text("A prompt is not a sentence.", font_size=54, weight=BOLD, color=self.C["white"])
+        hook.set_width(9.2)
+        hook.move_to([0, 5.7, 0])
 
-        sub = Text("It is a system.", font_size=44, weight=BOLD, color="#CBD5E1")
-        sub.move_to([0, 6.55, 0])
+        underline = Line([-4.0, 4.85, 0], [4.0, 4.85, 0], color=self.C["cyan"], stroke_width=5)
 
-        goal = self.node("GOAL", self.COLORS["goal"], [-3.5, 3.2, 0], 0.82, 25)
-        context = self.node("CONTEXT", self.COLORS["context"], [3.2, 2.4, 0], 0.90, 23)
-        constraints = self.node("LIMITS", self.COLORS["constraints"], [-2.6, 0.2, 0], 0.86, 23)
-        examples = self.node("EXAMPLES", self.COLORS["examples"], [3.0, -0.6, 0], 0.90, 21)
-
-        for mob in [goal, context, constraints, examples]:
-            mob.set_opacity(0)
-
-        self.play(FadeIn(eyebrow, shift=DOWN * 0.2), Write(hook), FadeIn(sub, shift=UP * 0.2), run_time=1.25)
-        self.play(
-            LaggedStart(
-                *[FadeIn(m, shift=0.35 * UP) for m in [goal, context, constraints, examples]],
-                lag_ratio=0.16,
-            ),
-            run_time=2.0,
-        )
-
-        loose_links = VGroup(
-            self.connector(goal, context, "#334155", 2, 0.35),
-            self.connector(context, examples, "#334155", 2, 0.35),
-            self.connector(examples, constraints, "#334155", 2, 0.35),
-        )
-        self.play(Create(loose_links), run_time=0.65)
-        self.wait(1.10)
+        play(FadeIn(kicker, shift=DOWN * 0.2), FadeIn(hook, shift=UP * 0.25), run_time=0.85)
+        play(Create(underline), run_time=0.35)
+        wait_until(2.6)
 
         # ------------------------------------------------------------------
-        # 5–11s — The pieces connect into a specification.
+        # Beat 2 — 2.6–4.3
+        # "It is a system."
         # ------------------------------------------------------------------
-        self.play(
-            FadeOut(hook, shift=UP * 0.35),
-            FadeOut(sub, shift=UP * 0.2),
-            eyebrow.animate.move_to([0, 8.6, 0]),
-            run_time=0.6,
+        system = Text("It is a SYSTEM.", font_size=64, weight=BOLD, color=self.C["white"])
+        system.move_to([0, 5.8, 0])
+
+        orbit = Circle(radius=2.15, color=self.C["cyan"], stroke_width=3).move_to([0, 0.6, 0])
+        core = Circle(radius=0.82, color=self.C["white"], stroke_width=4, fill_color=self.C["panel"], fill_opacity=1).move_to([0, 0.6, 0])
+        core_text = Text("INPUT", font_size=22, weight=BOLD, color=self.C["white"]).move_to(core.get_center())
+
+        play(
+            FadeOut(kicker),
+            Transform(hook, system),
+            FadeOut(underline),
+            Create(orbit),
+            FadeIn(core, scale=0.7),
+            FadeIn(core_text, scale=0.7),
+            run_time=0.9,
         )
-
-        center = self.node("SPEC", self.COLORS["core"], [0, 1.65, 0], 1.05, 29)
-        center.set_opacity(0)
-
-        target_positions = {
-            goal: [-3.15, 3.55, 0],
-            context: [3.15, 3.55, 0],
-            constraints: [-3.15, -0.45, 0],
-            examples: [3.15, -0.45, 0],
-        }
-
-        center.set_opacity(1)
-        self.play(FadeIn(center, scale=0.7), run_time=0.45)
-        self.play(
-            *[
-                mob.animate.move_to(pos).scale(0.92).set_opacity(1)
-                for mob, pos in target_positions.items()
-            ],
-            run_time=1.15,
-        )
-        self.play(FadeOut(loose_links), run_time=0.25)
-
-        links = VGroup(
-            self.connector(goal, center, self.COLORS["goal"], 4, 0.82),
-            self.connector(context, center, self.COLORS["context"], 4, 0.82),
-            self.connector(constraints, center, self.COLORS["constraints"], 4, 0.82),
-            self.connector(examples, center, self.COLORS["examples"], 4, 0.82),
-        )
-        self.play(Create(links), run_time=0.9)
-
-        flow = self.pulse(goal.get_center(), self.COLORS["goal"])
-        self.add(flow)
-        self.play(MoveAlongPath(flow, Line(goal.get_center(), center.get_center()), rate_func=smooth), run_time=0.65)
-        self.play(MoveAlongPath(flow, Line(context.get_center(), center.get_center()), rate_func=smooth), run_time=0.65)
-        self.play(MoveAlongPath(flow, Line(constraints.get_center(), center.get_center()), rate_func=smooth), run_time=0.65)
-        self.play(MoveAlongPath(flow, Line(examples.get_center(), center.get_center()), rate_func=smooth), run_time=0.65)
-        self.remove(flow)
-
-        label = Text("CONNECTED", font_size=27, weight=BOLD, color="#E2E8F0")
-        label.move_to([0, -2.25, 0])
-        self.play(FadeIn(label, shift=UP * 0.25), run_time=0.45)
-        self.wait(0.80)
+        wait_until(4.3)
 
         # ------------------------------------------------------------------
-        # 11–17s — The specification branches into possible actions.
+        # Beat 3 — 4.3–8.2
+        # "You start with a goal, context, constraints, and examples."
         # ------------------------------------------------------------------
-        self.play(
-            label.animate.move_to([0, 7.1, 0]).scale(0.82),
-            self.camera.frame.animate.set_width(11.5),
-            run_time=0.8,
-        )
+        goal = self.node("GOAL", self.C["cyan"], [-3.25, 2.55, 0], 0.72, 22)
+        context = self.node("CONTEXT", self.C["violet"], [3.25, 2.55, 0], 0.78, 20)
+        limits = self.node("LIMITS", self.C["amber"], [-3.25, -1.45, 0], 0.72, 22)
+        examples = self.node("EXAMPLES", self.C["green"], [3.25, -1.45, 0], 0.80, 19)
 
-        action_research = self.node("RESEARCH", self.COLORS["research"], [-3.45, -1.3, 0], 0.95, 21)
-        action_explain = self.node("EXPLAIN", self.COLORS["explain"], [0, -3.4, 0], 0.90, 23)
-        action_build = self.node("BUILD", self.COLORS["build"], [3.45, -1.3, 0], 0.88, 24)
+        for n in [goal, context, limits, examples]:
+            n.set_opacity(0)
 
-        branch_links = VGroup(
-            self.connector(center, action_research, self.COLORS["research"], 4, 0.8),
-            self.connector(center, action_explain, self.COLORS["explain"], 4, 0.8),
-            self.connector(center, action_build, self.COLORS["build"], 4, 0.8),
-        )
-
-        question = Text("WHAT DOES THE USER NEED NEXT?", font_size=27, weight=BOLD, color="#94A3B8")
-        question.move_to([0, 5.75, 0])
-
-        self.play(FadeIn(question, shift=DOWN * 0.2), run_time=0.4)
-        self.play(
-            LaggedStart(
-                FadeIn(action_research, shift=0.4 * UP),
-                FadeIn(action_explain, shift=0.4 * UP),
-                FadeIn(action_build, shift=0.4 * UP),
-                lag_ratio=0.18,
-            ),
+        play(
+            FadeOut(system, shift=UP * 0.25),
+            FadeOut(orbit),
+            FadeOut(core),
+            FadeOut(core_text),
+            *[FadeIn(n, shift=UP * 0.25) for n in [goal, context, limits, examples]],
             run_time=1.0,
         )
-        self.play(Create(branch_links), run_time=0.8)
 
-        selector = self.pulse(center.get_center(), "#FFFFFF")
-        self.add(selector)
-        self.play(MoveAlongPath(selector, Line(center.get_center(), action_research.get_center()), rate_func=smooth), run_time=0.9)
-        self.remove(selector)
+        links = VGroup(
+            self.link(goal, context),
+            self.link(context, examples),
+            self.link(examples, limits),
+            self.link(limits, goal),
+        )
+        play(Create(links), run_time=0.45)
 
-        research_ring = Circle(radius=1.24, color=self.COLORS["research"], stroke_width=6)
-        research_ring.move_to(action_research.get_center())
-        self.play(Create(research_ring), action_research.animate.scale(1.12), run_time=0.65)
+        for a, b, c in [
+            (goal, context, self.C["cyan"]),
+            (context, examples, self.C["violet"]),
+            (examples, limits, self.C["green"]),
+            (limits, goal, self.C["amber"]),
+        ]:
+            self.dot_flow(a, b, c)
+
+        wait_until(8.2)
+
+        # ------------------------------------------------------------------
+        # Beat 4 — 8.2–15.4
+        # "When those pieces connect ... usable specification."
+        # ------------------------------------------------------------------
+        spec = self.node("SPEC", self.C["white"], [0, 0.55, 0], 1.08, 30)
+        spec.set_opacity(0)
+
+        spec_label = Text("CONNECTED → USABLE", font_size=25, weight=BOLD, color=self.C["muted"])
+        spec_label.move_to([0, 6.9, 0])
+
+        play(FadeIn(spec_label, shift=DOWN * 0.2), FadeIn(spec, scale=0.65), run_time=0.7)
+
+        destinations = {
+            goal: [-3.15, 3.25, 0],
+            context: [3.15, 3.25, 0],
+            limits: [-3.15, -2.05, 0],
+            examples: [3.15, -2.05, 0],
+        }
+        play(
+            *[n.animate.move_to(p).scale(0.9) for n, p in destinations.items()],
+            run_time=0.9,
+        )
+
+        causal = VGroup(
+            self.link(goal, spec, self.C["cyan"], 4, 0.85),
+            self.link(context, spec, self.C["violet"], 4, 0.85),
+            self.link(limits, spec, self.C["amber"], 4, 0.85),
+            self.link(examples, spec, self.C["green"], 4, 0.85),
+        )
+        play(Create(causal), run_time=0.65)
+
+        for n, col in [(goal, self.C["cyan"]), (context, self.C["violet"]), (limits, self.C["amber"]), (examples, self.C["green"])]:
+            self.dot_flow(n, spec, col)
+
+        # Turn the specification into a structured decision point.
+        research = self.node("RESEARCH", self.C["blue"], [-3.15, -5.0, 0], 0.82, 19)
+        explain = self.node("EXPLAIN", self.C["violet"], [0, -6.05, 0], 0.80, 20)
+        build = self.node("BUILD", self.C["amber"], [3.15, -5.0, 0], 0.76, 21)
+
+        branch = VGroup(
+            self.link(spec, research, self.C["blue"], 3, 0.75),
+            self.link(spec, explain, self.C["violet"], 3, 0.75),
+            self.link(spec, build, self.C["amber"], 3, 0.75),
+        )
+        play(
+            FadeIn(research, shift=UP * 0.35),
+            FadeIn(explain, shift=UP * 0.35),
+            FadeIn(build, shift=UP * 0.35),
+            Create(branch),
+            run_time=1.0,
+        )
+        wait_until(15.4)
+
+        # ------------------------------------------------------------------
+        # Beat 5 — 15.4–19.7
+        # "That structure determines what happens next: research, explanation, or building."
+        # ------------------------------------------------------------------
+        next_label = Text("THE NEXT ACTION IS A CONSEQUENCE.", font_size=28, weight=BOLD, color=self.C["white"])
+        next_label.set_width(9.3)
+        next_label.move_to([0, 7.25, 0])
+
+        play(FadeIn(next_label, shift=DOWN * 0.2), run_time=0.45)
+
+        # Focus on RESEARCH and dim alternatives.
+        play(
+            research.animate.scale(1.18),
+            explain.animate.set_opacity(0.28),
+            build.animate.set_opacity(0.28),
+            run_time=0.55,
+        )
 
         evidence = VGroup(
-            Dot([-2.9, -4.25, 0], radius=0.16, color="#93C5FD"),
-            Dot([-1.95, -4.75, 0], radius=0.16, color="#BFDBFE"),
-            Dot([-1.05, -4.25, 0], radius=0.16, color="#60A5FA"),
+            Dot([-2.55, -6.55, 0], radius=0.13, color=self.C["blue"]),
+            Dot([-1.85, -6.9, 0], radius=0.13, color=self.C["blue"]),
+            Dot([-1.15, -6.55, 0], radius=0.13, color=self.C["blue"]),
         )
-        evidence_label = Text("EVIDENCE", font_size=24, weight=BOLD, color="#BFDBFE")
-        evidence_label.move_to([-1.95, -5.25, 0])
-
-        self.play(
-            LaggedStart(*[FadeIn(d, scale=0.2) for d in evidence], lag_ratio=0.18),
-            FadeIn(evidence_label, shift=UP * 0.2),
-            run_time=0.9,
-        )
-
+        evidence_title = Text("EVIDENCE", font_size=21, weight=BOLD, color="#BFDBFE").move_to([-1.85, -7.35, 0])
         evidence_links = VGroup(
-            Line(action_research.get_center(), evidence[0].get_center(), color="#60A5FA", stroke_width=3),
-            Line(action_research.get_center(), evidence[1].get_center(), color="#60A5FA", stroke_width=3),
-            Line(action_research.get_center(), evidence[2].get_center(), color="#60A5FA", stroke_width=3),
+            self.link(research, evidence[0], self.C["blue"], 2, 0.7),
+            self.link(research, evidence[1], self.C["blue"], 2, 0.7),
+            self.link(research, evidence[2], self.C["blue"], 2, 0.7),
         )
-        self.play(Create(evidence_links), run_time=0.5)
-        self.wait(0.70)
+        play(FadeIn(evidence, scale=0.4), FadeIn(evidence_title, shift=UP * 0.2), Create(evidence_links), run_time=0.75)
+
+        for d in evidence:
+            self.play(MoveAlongPath(Dot(research.get_center(), radius=0.07, color=self.C["blue"]),
+                                    Line(research.get_center(), d.get_center()), rate_func=smooth), run_time=0.3)
+
+        wait_until(19.7)
 
         # ------------------------------------------------------------------
-        # 17–24s — Evidence transforms into an artifact, not another card.
+        # Beat 6 — 19.7–24.9
+        # "And the plan can keep transforming until it becomes a real result."
         # ------------------------------------------------------------------
-        self.play(
-            FadeOut(question, shift=UP * 0.25),
-            FadeOut(label, shift=UP * 0.2),
-            FadeOut(branch_links),
-            FadeOut(research_ring),
-            FadeOut(action_explain),
-            FadeOut(action_build),
+        play(
+            FadeOut(next_label),
+            FadeOut(causal),
+            FadeOut(branch),
+            FadeOut(goal),
             FadeOut(context),
-            FadeOut(constraints),
+            FadeOut(limits),
             FadeOut(examples),
-            run_time=0.75,
+            FadeOut(explain),
+            FadeOut(build),
+            FadeOut(spec_label),
+            FadeOut(research),
+            run_time=0.65,
         )
 
-        # Move the remaining causal chain upward before the transformation.
-        self.play(
-            center.animate.move_to([0, 4.5, 0]).scale(0.82),
-            goal.animate.move_to([-3.6, 2.6, 0]).scale(0.78),
-            evidence.animate.shift(DOWN * 0.1),
-            evidence_label.animate.shift(DOWN * 0.1),
-            run_time=0.75,
-        )
+        action = self.node("ACTION", self.C["green"], [0, -1.0, 0], 1.12, 27)
+        action_title = Text("EVIDENCE → ACTION", font_size=34, weight=BOLD, color=self.C["white"])
+        action_title.move_to([0, 6.6, 0])
 
-        artifact_title = Text("FROM EVIDENCE TO ACTION", font_size=31, weight=BOLD, color="#CBD5E1")
-        artifact_title.move_to([0, 7.0, 0])
+        play(FadeIn(action_title, shift=DOWN * 0.2), FadeIn(action, scale=0.7), run_time=0.6)
 
-        action = self.node("ACTION", self.COLORS["result"], [0, -1.5, 0], 1.05, 27)
-        action.set_opacity(0)
-
-        action_lines = VGroup(
-            Text("compare", font_size=28, color="#A7F3D0"),
-            Text("decide", font_size=28, color="#A7F3D0"),
-            Text("build", font_size=28, color="#A7F3D0"),
-        ).arrange(RIGHT, buff=0.55)
-        action_lines.move_to([0, -3.45, 0])
-        action_lines.set_opacity(0)
-
-        self.play(FadeIn(artifact_title, shift=DOWN * 0.2), run_time=0.4)
-        self.play(
-            evidence[0].animate.move_to([-1.25, -0.25, 0]),
-            evidence[1].animate.move_to([0, 0.35, 0]),
-            evidence[2].animate.move_to([1.25, -0.25, 0]),
-            evidence_label.animate.move_to([0, 1.25, 0]),
+        play(
+            evidence[0].animate.move_to([-1.35, 2.0, 0]),
+            evidence[1].animate.move_to([0, 2.55, 0]),
+            evidence[2].animate.move_to([1.35, 2.0, 0]),
+            evidence_title.animate.move_to([0, 3.4, 0]),
             run_time=0.9,
         )
 
-        result_links = VGroup(
-            Line(evidence[0].get_center(), action.get_center(), color=self.COLORS["result"], stroke_width=3),
-            Line(evidence[1].get_center(), action.get_center(), color=self.COLORS["result"], stroke_width=3),
-            Line(evidence[2].get_center(), action.get_center(), color=self.COLORS["result"], stroke_width=3),
+        action_links = VGroup(
+            self.link(evidence[0], action, self.C["green"], 3, 0.8),
+            self.link(evidence[1], action, self.C["green"], 3, 0.8),
+            self.link(evidence[2], action, self.C["green"], 3, 0.8),
         )
-        self.play(FadeIn(action), Create(result_links), run_time=0.85)
+        play(Create(action_links), run_time=0.55)
+
+        action_words = VGroup(
+            Text("compare", font_size=25, color="#A7F3D0"),
+            Text("decide", font_size=25, color="#A7F3D0"),
+            Text("build", font_size=25, color="#A7F3D0"),
+        ).arrange(RIGHT, buff=0.5).move_to([0, -3.0, 0])
+
+        play(FadeIn(action_words, shift=UP * 0.2), run_time=0.45)
+
         self.play(
-            FadeIn(action_lines, shift=UP * 0.3),
-            action.animate.set_opacity(1).scale(1.10),
-            run_time=0.75,
+            evidence[1].animate.scale(1.25),
+            action.animate.scale(1.08),
+            run_time=0.5,
         )
+        elapsed += 0.5
 
-        # The original pieces become a small provenance trail.
-        provenance = VGroup(
-            Text("GOAL", font_size=20, color=self.COLORS["goal"], weight=BOLD),
-            Text("→", font_size=24, color="#64748B"),
-            Text("SPEC", font_size=20, color="#E2E8F0", weight=BOLD),
-            Text("→", font_size=24, color="#64748B"),
-            Text("EVIDENCE", font_size=20, color="#93C5FD", weight=BOLD),
-            Text("→", font_size=24, color="#64748B"),
-            Text("ACTION", font_size=20, color=self.COLORS["result"], weight=BOLD),
-        ).arrange(RIGHT, buff=0.16)
-        provenance.move_to([0, 6.15, 0])
-
-        self.play(FadeIn(provenance, shift=DOWN * 0.2), run_time=0.45)
-        self.wait(0.95)
+        wait_until(24.9)
 
         # ------------------------------------------------------------------
-        # 24–30s — Pull back: one connected system, one causal story.
+        # Beat 7 — 24.9–27.4
+        # "The important part is not decoration."
         # ------------------------------------------------------------------
-        self.play(
-            self.camera.frame.animate.set_width(10.5).move_to([0, 0.2, 0]),
-            run_time=1.25,
+        play(
+            FadeOut(action_title),
+            FadeOut(action_words),
+            FadeOut(action_links),
+            FadeOut(evidence),
+            FadeOut(evidence_title),
+            run_time=0.5,
         )
 
-        all_chain = VGroup(
-            Text("INPUT", font_size=25, weight=BOLD, color="#94A3B8"),
-            Text("→", font_size=30, color="#64748B"),
-            Text("STRUCTURE", font_size=25, weight=BOLD, color="#E2E8F0"),
-            Text("→", font_size=30, color="#64748B"),
-            Text("ACTION", font_size=25, weight=BOLD, color=self.COLORS["result"]),
-            Text("→", font_size=30, color="#64748B"),
-            Text("RESULT", font_size=25, weight=BOLD, color="#F0FDFA"),
-        ).arrange(RIGHT, buff=0.18)
-        all_chain.move_to([0, -7.5, 0])
+        principle = Text("NOT DECORATION.", font_size=56, weight=BOLD, color=self.C["amber"])
+        principle.move_to([0, 5.8, 0])
 
+        causal_text = Text("CAUSE  →  TRANSFORMATION  →  RESULT", font_size=29, weight=BOLD, color=self.C["white"])
+        causal_text.set_width(9.2)
+        causal_text.move_to([0, 1.2, 0])
+
+        arrow1 = Arrow([-3.5, -0.4, 0], [-0.7, -0.4, 0], color=self.C["cyan"], stroke_width=5)
+        arrow2 = Arrow([0.7, -0.4, 0], [3.5, -0.4, 0], color=self.C["green"], stroke_width=5)
+
+        play(FadeIn(principle, shift=UP * 0.2), FadeIn(causal_text, shift=UP * 0.2), GrowArrow(arrow1), GrowArrow(arrow2), run_time=0.8)
+        wait_until(27.4)
+
+        # ------------------------------------------------------------------
+        # Beat 8 — 27.4–30.0
+        # "Every movement should explain a relationship."
+        # ------------------------------------------------------------------
         closing = Text(
             "Every movement should explain a relationship.",
             font_size=42,
             weight=BOLD,
+            color=self.C["white"],
         )
-        closing.set_width(9.8)
-        closing.move_to([0, 8.0, 0])
+        closing.set_width(9.4)
+        closing.move_to([0, 6.0, 0])
 
-        self.play(FadeIn(all_chain, shift=UP * 0.25), FadeIn(closing, shift=DOWN * 0.25), run_time=0.8)
+        chain = VGroup(
+            Text("INPUT", font_size=24, weight=BOLD, color=self.C["muted"]),
+            Text("→", font_size=29, color=self.C["line"]),
+            Text("STRUCTURE", font_size=24, weight=BOLD, color=self.C["white"]),
+            Text("→", font_size=29, color=self.C["line"]),
+            Text("ACTION", font_size=24, weight=BOLD, color=self.C["green"]),
+            Text("→", font_size=29, color=self.C["line"]),
+            Text("RESULT", font_size=24, weight=BOLD, color=self.C["cyan"]),
+        ).arrange(RIGHT, buff=0.18).move_to([0, -2.3, 0])
 
-        flow_dot = self.pulse(goal.get_center(), self.COLORS["goal"])
-        self.add(flow_dot)
-        self.play(
-            MoveAlongPath(flow_dot, Line(goal.get_center(), center.get_center()), rate_func=smooth),
-            run_time=0.55,
-        )
-        self.play(
-            MoveAlongPath(flow_dot, Line(center.get_center(), evidence[1].get_center()), rate_func=smooth),
-            run_time=0.55,
-        )
-        self.play(
-            MoveAlongPath(flow_dot, Line(evidence[1].get_center(), action.get_center()), rate_func=smooth),
-            run_time=0.55,
-        )
-        self.remove(flow_dot)
+        play(FadeOut(principle), FadeOut(causal_text), FadeOut(arrow1), FadeOut(arrow2), FadeIn(closing, shift=DOWN * 0.2), FadeIn(chain, shift=UP * 0.2), run_time=0.8)
 
-        self.play(
-            action.animate.scale(1.08),
-            run_time=0.6,
-        )
-        self.wait(1.55)
+        pulse = Dot([-3.9, -2.3, 0], radius=0.11, color=self.C["cyan"])
+        self.add(pulse)
+        play(MoveAlongPath(pulse, Line([-3.9, -2.3, 0], [3.9, -2.3, 0]), rate_func=smooth), run_time=0.9)
+        self.remove(pulse)
+
+        self.camera.frame.animate.set_width(10.0)
+        play(action.animate.scale(1.08), run_time=0.3)
+        wait_until(30.0)
