@@ -1,5 +1,5 @@
 import React from 'react';
-import {Easing, interpolate} from 'remotion';
+import {Easing} from 'remotion';
 
 export const clamp=(n:number)=>Math.max(0,Math.min(1,n));
 export const ease=(n:number)=>Easing.out(Easing.cubic)(clamp(n));
@@ -51,7 +51,7 @@ export const IntroAsset=({frame,accent,progress}:Props)=>{
       <circle cx="-235" cy="0" r="6" fill="#fff" opacity=".5"/>
     </g>
     <g opacity={b} transform={`translate(310 385) scale(${.82+.18*b})`}>
-      <circle r="105" fill={`url(#intro g)`} opacity=".22"/>
+      <circle r="105" fill={`url(#introg)`} opacity=".22"/>
       <circle r="78" fill="#0b1119" stroke={accent} strokeWidth="3"/>
       <path d="M-34 12 C-12 -44 20 -42 38 -5 C54 28 22 55 -2 29 C-23 8 -53 29 -34 58" fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" opacity=".9"/>
       <circle cx="-25" cy="-30" r="8" fill={accent}/><circle cx="35" cy="24" r="6" fill={accent} opacity=".65"/>
