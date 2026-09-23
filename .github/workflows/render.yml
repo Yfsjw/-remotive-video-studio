@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - visual-engine-v9
+      - main
 
 jobs:
   render:
