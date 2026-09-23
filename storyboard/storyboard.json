@@ -1,0 +1,24 @@
+{
+  "project": "visual-engine-prototype",
+  "test": {
+    "durationSeconds": 5,
+    "voice": "Turn noise into evidence.",
+    "visualGoal": "Scattered information becomes one clear signal without relying on text.",
+    "acceptance": [
+      "The visual communicates the transformation without captions.",
+      "Manim is the primary visual.",
+      "Remotion only composes, times and finishes the scene."
+    ]
+  },
+  "scene": {
+    "id": "scene-01",
+    "type": "data_transformation",
+    "concept": "noise_to_evidence",
+    "visual": {
+      "input": "scattered documents and signals",
+      "transformation": "filter and converge",
+      "output": "one clear evidence node"
+    },
+    "assets": ["manim/scene01.mp4"]
+  }
+}
