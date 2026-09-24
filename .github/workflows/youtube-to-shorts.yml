@@ -37,19 +37,29 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           yt-dlp --version
           mkdir -p work/source work/audio out
-          yt-dlp \
-            --no-playlist \
-            --retries 3 \
-            --fragment-retries 3 \
-            --extractor-retries 3 \
-            --socket-timeout 30 \
-            --force-ipv4 \
-            --js-runtimes node \
-            --remote-components ejs:github \
-            --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
-            --merge-output-format mp4 \
-            --output "work/source/source.%(ext)s" \
-            "$YOUTUBE_URL"
+          if [[ "$YOUTUBE_URL" == http://*://* || "$YOUTUBE_URL" == https://* ]]; then
+            if [[ "$YOUTUBE_URL" == *youtube.com/* || "$YOUTUBE_URL" == *youtu.be/* ]]; then
+              yt-dlp \
+                --no-playlist \
+                --retries 3 \
+                --fragment-retries 3 \
+                --extractor-retries 3 \
+                --socket-timeout 30 \
+                --force-ipv4 \
+                --js-runtimes node \
+                --remote-components ejs:github \
+                --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
+                --merge-output-format mp4 \
+                --output "work/source/source.%(ext)s" \
+                "$YOUTUBE_URL"
+            else
+              curl -L --fail --retry 3 --retry-delay 2 --connect-timeout 30 \
+                "$YOUTUBE_URL" -o work/source/source.mp4
+            fi
+          else
+            echo "Invalid source URL"
+            exit 1
+          fi
           SOURCE="$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"
           test -n "$SOURCE"
           ffprobe -v error -show_entries format=duration,size -of default=nw=1 "$SOURCE"
