@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       youtube_url:
-        description: "YouTube video URL"
+        description: "YouTube video URL or direct MP4 URL"
         required: true
         type: string
       clips:
         description: "Number of Shorts to create"
         required: true
-        default: "4"
+        default: "1"
         type: string
 
 jobs:
@@ -27,42 +27,58 @@ jobs:
       - name: Install media tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg cmake build-essential python3 nodejs
+          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file
 
-      - name: Download source video
+      - name: Diagnose and download source
         env:
-          YOUTUBE_URL: ${{ inputs.youtube_url }}
+          SOURCE_URL: ${{ inputs.youtube_url || 'https://media.w3.org/2010/05/sintel/trailer.mp4' }}
+        shell: bash
         run: |
-          python3 -m pip install --user -U yt-dlp
-          export PATH="$HOME/.local/bin:$PATH"
-          yt-dlp --version
+          set -Eeuo pipefail
           mkdir -p work/source work/audio out
-          if [[ "$YOUTUBE_URL" == http://*://* || "$YOUTUBE_URL" == https://* ]]; then
-            if [[ "$YOUTUBE_URL" == *youtube.com/* || "$YOUTUBE_URL" == *youtu.be/* ]]; then
-              yt-dlp \
-                --no-playlist \
-                --retries 3 \
-                --fragment-retries 3 \
-                --extractor-retries 3 \
-                --socket-timeout 30 \
-                --force-ipv4 \
-                --js-runtimes node \
-                --remote-components ejs:github \
-                --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
-                --merge-output-format mp4 \
-                --output "work/source/source.%(ext)s" \
-                "$YOUTUBE_URL"
-            else
-              curl -L --fail --retry 3 --retry-delay 2 --connect-timeout 30 \
-                "$YOUTUBE_URL" -o work/source/source.mp4
-            fi
+
+          echo "SOURCE_URL=$SOURCE_URL"
+          echo "Runner:"
+          uname -a
+          curl --version | head -n 1
+          ffmpeg -version | head -n 1
+
+          echo "== HEAD/redirect diagnostic =="
+          curl -4 -sSIL --max-time 60 -A "Mozilla/5.0" "$SOURCE_URL" | sed -n '1,40p'
+
+          if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
+            python3 -m pip install --user -U yt-dlp
+            export PATH="$HOME/.local/bin:$PATH"
+            yt-dlp --version
+            yt-dlp \
+              --no-playlist \
+              --retries 3 \
+              --fragment-retries 3 \
+              --extractor-retries 3 \
+              --socket-timeout 30 \
+              --force-ipv4 \
+              --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
+              --merge-output-format mp4 \
+              --output "work/source/source.%(ext)s" \
+              "$SOURCE_URL"
+          elif [[ "$SOURCE_URL" == http://* || "$SOURCE_URL" == https://* ]]; then
+            echo "== Direct media download =="
+            curl -4 -L --fail --show-error --retry 5 --retry-delay 3 \
+              --connect-timeout 30 --max-time 900 \
+              -A "Mozilla/5.0" \
+              "$SOURCE_URL" -o work/source/source.mp4
           else
             echo "Invalid source URL"
             exit 1
           fi
+
+          echo "== Downloaded files =="
+          find work/source -maxdepth 1 -type f -printf '%p %s bytes\n'
           SOURCE="$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"
-          test -n "$SOURCE"
-          ffprobe -v error -show_entries format=duration,size -of default=nw=1 "$SOURCE"
+          test -s "$SOURCE"
+          file "$SOURCE"
+          echo "== ffprobe =="
+          ffprobe -v error -show_entries format=duration,size,format_name -of default=nw=1 "$SOURCE"
 
       - name: Build whisper.cpp
         run: |
@@ -86,7 +102,7 @@ jobs:
 
       - name: Select and render Shorts
         env:
-          CLIP_COUNT: ${{ inputs.clips }}
+          CLIP_COUNT: ${{ inputs.clips || '1' }}
         run: |
           python3 scripts/youtube_to_shorts.py \
             --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)" \
