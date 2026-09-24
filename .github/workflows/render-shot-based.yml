@@ -1,4 +1,5 @@
 name: Render Shot-Based Prototype
+# Trigger render after ShotBased composition registration fix
 
 on:
   workflow_dispatch:
