@@ -37,7 +37,7 @@ jobs:
           python -m pip install torch torchvision ftfy regex tqdm git+https://github.com/openai/CLIP.git
 
       - name: Retrieve semantic media
-        run: node scripts/retrieve-semantic-media.mjs
+        run: node scripts/retrieve-semantic-media-v3.mjs
 
       - name: Validate media diversity
         run: |
