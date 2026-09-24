@@ -1,0 +1,64 @@
+name: Render Shot-Based Prototype
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - shot-based-prototype-v1
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: |
+          npm install
+          python -m pip install --upgrade pip
+          python -m pip install piper-tts
+
+      - name: Download real footage
+        run: |
+          mkdir -p public/media
+          curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-typing-on-laptop-2630/1080p.mp4" -o public/media/typing.mp4
+          curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-coffee-pour-1355/1080p.mp4" -o public/media/coffee.mp4
+          curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-night-city-from-the-window-3934/1080p.mp4" -o public/media/city.mp4
+          ffprobe -v error -show_entries format=duration -of default=nw=1 public/media/typing.mp4
+          ffprobe -v error -show_entries format=duration -of default=nw=1 public/media/coffee.mp4
+          ffprobe -v error -show_entries format=duration -of default=nw=1 public/media/city.mp4
+
+      - name: Generate US English narration
+        run: |
+          mkdir -p public
+          printf '%s\n' "Most AI videos explain the idea. They rarely show it. The fix is simple: edit in shots, not slides. Start with the narration. Then ask: what should the viewer actually see? Not a circle. Not a card. A real visual. A change of place can carry a transition. A close-up can make the idea feel concrete. Then cut again before the image becomes wallpaper. Graphics still matter. But they explain what footage cannot. The timeline becomes a sequence of decisions. That is the experiment we are testing now." | python -m piper -m en_US-lessac-high --data-dir public -f narration.wav --length_scale 0.86
+          ffmpeg -y -i narration.wav -af "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB" -ar 22050 -ac 1 public/voice-shot-test.wav
+
+      - name: Render shot-based video
+        run: npm run render -- --frames=0-680 --output=out/shot-based-prototype.mp4
+
+      - name: Verify output
+        run: |
+          test -s out/shot-based-prototype.mp4
+          ffprobe -v error -show_entries format=duration -show_entries stream=width,height,r_frame_rate,codec_name -of default=nw=1 out/shot-based-prototype.mp4
+
+      - name: Upload MP4
+        uses: actions/upload-artifact@v4
+        with:
+          name: shot-based-prototype-v1
+          path: out/shot-based-prototype.mp4
+          if-no-files-found: error
