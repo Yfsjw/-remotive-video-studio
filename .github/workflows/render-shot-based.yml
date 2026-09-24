@@ -50,7 +50,7 @@ jobs:
         run: |
           mkdir -p public
           python -m piper.download_voices --data-dir public en_US-lessac-high
-          printf '%s\n' "Most AI videos explain the idea. They rarely show it. The fix is simple: edit in shots, not slides. Start with the narration. Then ask: what should the viewer actually see? Not a circle. Not a card. A real visual. A change of place can carry a transition. A close-up can make the idea feel concrete. Then cut again before the image becomes wallpaper. Graphics still matter. But they explain what footage cannot. The timeline becomes a sequence of decisions." | python -m piper -m en_US-lessac-high --data-dir public -f narration.wav --length_scale 0.86
+          printf '%s\n' "Most AI videos explain the idea. They rarely show it. The fix is simple: edit in shots, not slides. Start with the narration. Then ask: what should the viewer actually see? Not a circle. Not a card. A real visual. A change of place can carry a transition. A close-up can make the idea feel concrete. Then cut again before the image becomes wallpaper. Graphics still matter. But they explain what footage cannot. The timeline becomes a sequence of decisions." | python -m piper -m en_US-lessac-high --data-dir public -f narration.wav --length_scale 1.0
           ffmpeg -y -i narration.wav -af "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=30,atrim=0:30" -ar 22050 -ac 1 public/voice-shot-test.wav
 
       - name: Typecheck
