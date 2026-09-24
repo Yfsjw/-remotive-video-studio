@@ -67,7 +67,7 @@ const ShotLayer = ({shot}:{shot:Shot}) => {
         src={staticFile(shot.src)}
         trimBefore={Math.round(shot.trim * fps)}
         muted
-        style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:shot.cropX ?? '50%',transform:\`scale(\${zoom})\`}}
+        style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:shot.cropX ?? '50%',transform: `scale(${zoom})`}}
         volume={0}
         playbackRate={1}
 
