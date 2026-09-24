@@ -1,6 +1,9 @@
 name: YouTube to Shorts
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       youtube_url:
