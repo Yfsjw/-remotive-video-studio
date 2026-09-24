@@ -38,6 +38,10 @@ jobs:
           curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-typing-on-laptop-2630/1080p.mp4" -o public/media/typing.mp4
           curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-coffee-pour-1355/1080p.mp4" -o public/media/coffee.mp4
           curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-night-city-from-the-window-3934/1080p.mp4" -o public/media/city.mp4
+          for f in typing coffee city; do
+            mv "public/media/$f.mp4" "public/media/$f-source.mp4"
+            ffmpeg -y -stream_loop -1 -i "public/media/$f-source.mp4" -t 12 -vf "scale=1920:-2:flags=lanczos,fps=30" -c:v libx264 -preset veryfast -pix_fmt yuv420p -an "public/media/$f.mp4"
+          done
           ffprobe -v error -show_entries format=duration -of default=nw=1 public/media/typing.mp4
           ffprobe -v error -show_entries format=duration -of default=nw=1 public/media/coffee.mp4
           ffprobe -v error -show_entries format=duration -of default=nw=1 public/media/city.mp4
@@ -46,10 +50,10 @@ jobs:
         run: |
           mkdir -p public
           printf '%s\n' "Most AI videos explain the idea. They rarely show it. The fix is simple: edit in shots, not slides. Start with the narration. Then ask: what should the viewer actually see? Not a circle. Not a card. A real visual. A change of place can carry a transition. A close-up can make the idea feel concrete. Then cut again before the image becomes wallpaper. Graphics still matter. But they explain what footage cannot. The timeline becomes a sequence of decisions. That is the experiment we are testing now." | python -m piper -m en_US-lessac-high --data-dir public -f narration.wav --length_scale 0.86
-          ffmpeg -y -i narration.wav -af "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB" -ar 22050 -ac 1 public/voice-shot-test.wav
+          ffmpeg -y -i narration.wav -af "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-42dB:stop_periods=-1:stop_duration=0.12:stop_threshold=-38dB,apad=pad_dur=30,atrim=0:30" -ar 22050 -ac 1 public/voice-shot-test.wav
 
       - name: Render shot-based video
-        run: npm run render -- --frames=0-680 --output=out/shot-based-prototype.mp4
+        run: npx remotion render src/index.tsx ShotBased out/shot-based-prototype.mp4 --concurrency=2
 
       - name: Verify output
         run: |
