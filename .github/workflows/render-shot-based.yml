@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - shot-based-prototype-v1
+  pull_request:
+    branches:
+      - main
 
 jobs:
   render:
