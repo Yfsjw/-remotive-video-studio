@@ -1,10 +1,10 @@
-name: Visual Renderer v1
+name: Visual Assets v2 Renderer
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - visual-renderer-v1
+      - visual-assets-v2
 
 jobs:
   render:
@@ -40,17 +40,18 @@ jobs:
           ffmpeg -y -i public/voice.wav -af "apad=pad_dur=30,atrim=0:30,loudnorm=I=-16:TP=-1.5:LRA=11" public/voice-normalized.wav
           mv public/voice-normalized.wav public/voice.wav
       - name: Render VisualPlanner MP4
-        run: npx remotion render src/planner-entry.tsx VisualPlanner out/visual-planner-v1.mp4 --concurrency=2
+        run: npx remotion render src/planner-entry.tsx VisualPlanner out/visual-planner-v2.mp4 --concurrency=2
       - name: Verify MP4
         run: |
-          test -s out/visual-planner-v1.mp4
-          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,codec_name -of default=nw=1 out/visual-planner-v1.mp4
-          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate -of default=nw=1 out/visual-planner-v1.mp4
-      - name: Upload rendered video
+          test -s out/visual-planner-v2.mp4
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,codec_name -of default=nw=1 out/visual-planner-v2.mp4
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate -of default=nw=1 out/visual-planner-v2.mp4
+      - name: Upload rendered video and visual assets
         uses: actions/upload-artifact@v4
         with:
-          name: visual-planner-v1
+          name: visual-assets-v2
           path: |
-            out/visual-planner-v1.mp4
+            out/visual-planner-v2.mp4
+            public/planner-assets/*.jpg
             public/planner-assets/manifest.json
           if-no-files-found: error
