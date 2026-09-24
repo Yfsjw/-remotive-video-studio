@@ -38,9 +38,9 @@ jobs:
       - name: Download real footage
         run: |
           mkdir -p public/media
-          curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-typing-on-laptop-2630/1080p.mp4" -o public/media/typing.mp4
-          curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-coffee-pour-1355/1080p.mp4" -o public/media/coffee.mp4
-          curl -L --fail --retry 3 "https://cdn.coverr.co/videos/coverr-night-city-from-the-window-3934/1080p.mp4" -o public/media/city.mp4
+          curl -L --fail --retry 3 "https://cdn.truefilesize.com/mp4/sample-10mb.mp4" -o public/media/typing.mp4
+          curl -L --fail --retry 3 "https://cdn.truefilesize.com/mp4/sample-10mb.mp4" -o public/media/coffee.mp4
+          curl -L --fail --retry 3 "https://cdn.truefilesize.com/mp4/sample-10mb.mp4" -o public/media/city.mp4
           for f in typing coffee city; do
             mv "public/media/$f.mp4" "public/media/$f-source.mp4"
             ffmpeg -y -stream_loop -1 -i "public/media/$f-source.mp4" -t 12 -vf "scale=1920:-2:flags=lanczos,fps=30" -c:v libx264 -preset veryfast -pix_fmt yuv420p -an "public/media/$f.mp4"
