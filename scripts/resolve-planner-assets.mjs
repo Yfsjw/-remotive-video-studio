@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import {execFile} from "node:child_process";
+import {promisify} from "node:util";
 
+const exec = promisify(execFile);
 const outDir = path.join(process.cwd(), "public", "planner-assets");
 await fs.mkdir(outDir, {recursive: true});
 
@@ -12,7 +15,7 @@ const assets = [
   {id:"data-analysis", queries:["data analysis computer screen","data visualization laptop","computer data analysis"], filename:"data-analysis.jpg"},
   {id:"ai-computer", queries:["artificial intelligence computer","AI technology computer screen","machine learning computer"], filename:"ai-computer.jpg"},
   {id:"robot-human-computer", queries:["human robot computer technology","robot hand computer","human computer interaction technology"], filename:"robot-human-computer.jpg"},
-  {id:"technology-workspace", queries:["modern technology workspace laptop","computer workspace technology","digital workspace computer"], filename:"technology-workspace.jpg"},
+  {id:"technology-workspace", queries:["modern technology workspace laptop","computer workspace technology","digital workspace computer"], filename:"technology workspace computer"], filename:"technology-workspace.jpg"},
 ];
 
 function clean(value) {
@@ -74,14 +77,21 @@ for (const asset of assets) {
   const item = await searchOpenverse(asset.queries);
   if (!item) throw new Error("No suitable Openverse image found for " + asset.id);
 
+  const sourcePath = path.join(outDir, asset.id + ".source");
+  const outputPath = path.join(outDir, asset.filename);
   const response = await fetch(item.url, {
     headers: {"User-Agent":"remotive-video-studio/visual-assets-v2 (asset resolver)"},
     signal: AbortSignal.timeout(30000),
   });
   if (!response.ok) throw new Error("Image download failed for " + asset.id + ": " + response.status);
+  await fs.writeFile(sourcePath, Buffer.from(await response.arrayBuffer()));
 
-  const bytes = Buffer.from(await response.arrayBuffer());
-  await fs.writeFile(path.join(outDir, asset.filename), bytes);
+  await exec("ffmpeg", [
+    "-y","-loglevel","error","-i",sourcePath,
+    "-vf","scale=1600:1600:force_original_aspect_ratio=decrease",
+    "-q:v","2",outputPath
+  ]);
+  await fs.unlink(sourcePath);
 
   manifest.assets.push({
     id: asset.id,
