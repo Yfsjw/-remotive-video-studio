@@ -140,9 +140,10 @@ def main():
         mp4 = os.path.join(args.out, f"short_{n:02d}.mp4")
         make_ass(cues, start, end, ass)
 
-        # Center crop to 9:16 while preserving the source height, then scale.
+        # Normalize any source aspect ratio to a true 1080x1920 frame.
+        # Scale UP enough to cover the portrait canvas, then center-crop.
         vf = (
-            "scale=1080:-2:force_original_aspect_ratio=increase,"
+            "scale=1080:1920:force_original_aspect_ratio=increase,"
             "crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,"
             "setsar=1,"
             f"subtitles={ass}"
