@@ -7,16 +7,16 @@ const MEDIA = join(ROOT, "public/media");
 mkdirSync(MEDIA, { recursive: true });
 
 const beats = [
-  { id:"hook", queries:["person laptop","office computer","technology"], caption:"Most AI videos explain the idea. They rarely show it.", type:"human-action" },
-  { id:"model", queries:["video editing","film editing","computer"], caption:"The fix is simple: edit in shots, not slides.", type:"process" },
-  { id:"narration", queries:["podcast microphone","person speaking","studio"], caption:"Start with the narration.", type:"human-action" },
-  { id:"intent", queries:["programming computer","software screen","computer screen"], caption:"Then ask: what should the viewer actually see?", type:"screen" },
-  { id:"concrete", queries:["keyboard hands","computer keyboard","typing"], caption:"Not a circle. Not a card. A real visual.", type:"close-up" },
-  { id:"transition", queries:["city traffic","city street","urban"], caption:"A change of place can carry a transition.", type:"environment" },
-  { id:"detail", queries:["server room","computer hardware","data center"], caption:"A close-up can make the idea feel concrete.", type:"detail" },
-  { id:"rhythm", queries:["camera operator","filmmaking","video production"], caption:"Then cut again before the image becomes wallpaper.", type:"production" },
-  { id:"graphic", queries:["data visualization","computer display","digital screen"], caption:"Graphics still matter. But they explain what footage cannot.", type:"screen" },
-  { id:"ending", queries:["technology city","city night","computer network"], caption:"The timeline becomes a sequence of decisions.", type:"environment" }
+  { id:"hook", queries:["computer laboratory technology","software developer computer","technology demonstration"], caption:"Most AI videos explain the idea. They rarely show it.", type:"human-action" },
+  { id:"model", queries:["video editing timeline","nonlinear video editing","film editor editing"], caption:"The fix is simple: edit in shots, not slides.", type:"process" },
+  { id:"narration", queries:["microphone studio recording","podcast recording studio","voice recording"], caption:"Start with the narration.", type:"human-action" },
+  { id:"intent", queries:["software interface computer screen","programming terminal screen","computer programmer"], caption:"Then ask: what should the viewer actually see?", type:"screen" },
+  { id:"concrete", queries:["computer hardware close up","microchip electronics close up","keyboard typing hands"], caption:"Not a circle. Not a card. A real visual.", type:"close-up" },
+  { id:"transition", queries:["technology laboratory","data center corridor","city technology"], caption:"A change of place can carry a transition.", type:"environment" },
+  { id:"detail", queries:["server room data center","computer motherboard electronics","semiconductor laboratory"], caption:"A close-up can make the idea feel concrete.", type:"detail" },
+  { id:"rhythm", queries:["film camera operator","video camera production","editing suite"], caption:"Then cut again before the image becomes wallpaper.", type:"production" },
+  { id:"graphic", queries:["data visualization dashboard","scientific visualization","computer graphics screen"], caption:"Graphics still matter. But they explain what footage cannot.", type:"screen" },
+  { id:"ending", queries:["computer network data center","technology laboratory","server room"], caption:"The timeline becomes a sequence of decisions.", type:"environment" }
 ];
 
 const headers = { "User-Agent":"RemotiveVideoStudio/0.3", "Accept":"application/json" };
@@ -68,7 +68,8 @@ function usable(x,used) {
   const mediaType=String(ii?.mediatype||"").toUpperCase();
   const title=titleOf(x).toLowerCase();
   const videoExt=/\.(mp4|webm|ogv|ogg|mov|mkv)$/i.test(title);
-  return !!ii &&
+  const bad = BAD_WORDS.some(w=>title.includes(w));
+  return !!ii && !bad &&
     !!ii.url &&
     (mediaType === "VIDEO" || mime.startsWith("video/") || videoExt) &&
     Number(ii.size||0)>0 &&
@@ -76,10 +77,19 @@ function usable(x,used) {
     !used.has(titleOf(x));
 }
 
+const BAD_WORDS = ["suicide","death","war","military","football","soccer","porn","sex","religion","politician","election","protest","accident","crime","disaster","animal","bird","cat","dog"];
+const GOOD_WORDS = ["computer","technology","software","programming","data","server","camera","video","editing","studio","laboratory","electronics","screen","digital","microchip","network","keyboard","recording"];
+
 function score(x,query) {
+  const ii=x.imageinfo?.[0];
   const title=titleOf(x).toLowerCase();
-  return query.toLowerCase().split(/\s+/).filter(t=>t.length>2)
-    .reduce((n,t)=>n+(title.includes(t)?4:0),0);
+  const desc=String(ii?.extmetadata?.ImageDescription?.value||"").replace(/<[^>]+>/g," ").toLowerCase().slice(0,2000);
+  const text=title+" "+desc;
+  const q=query.toLowerCase().split(/\s+/).filter(t=>t.length>2);
+  let n=q.reduce((sum,t)=>sum+(text.includes(t)?5:0),0);
+  n+=GOOD_WORDS.reduce((sum,t)=>sum+(text.includes(t)?1:0),0);
+  n-=BAD_WORDS.reduce((sum,t)=>sum+(text.includes(t)?10:0),0);
+  return n;
 }
 
 function safeName(s) {
@@ -123,7 +133,6 @@ function downloadAndNormalize(url,target) {
 
 async function main() {
   const used=new Set(), selected=[];
-  const durations=[78,84,78,84,78,90,84,90,102,132];
 
   for(const beat of beats) {
     let chosen=null;
@@ -131,7 +140,10 @@ async function main() {
     for(const q of beat.queries) {
       const candidates=(await searchCommons(q))
         .filter(x=>usable(x,used))
-        .sort((a,b)=>score(b,q)-score(a,q));
+        .map(x=>({x,score:score(x,q)}))
+        .filter(v=>v.score >= 5)
+        .sort((a,b)=>b.score-a.score)
+        .map(v=>v.x);
 
       console.log("SEARCH",beat.id,q,"candidates",candidates.length);
 
@@ -171,6 +183,12 @@ async function main() {
 
   let from=0;
   const shots=[],manifest=[];
+
+  const weights=selected.map(a=>Math.max(1,a.caption.split(/\s+/).length));
+  const rawTotal=weights.reduce((a,b)=>a+b,0);
+  const durations=weights.map(w=>Math.max(54,Math.round(w/rawTotal*900)));
+  let correction=900-durations.reduce((a,b)=>a+b,0);
+  durations[durations.length-1]+=correction;
 
   for(let i=0;i<selected.length;i++) {
     const a=selected[i], duration=durations[i];
