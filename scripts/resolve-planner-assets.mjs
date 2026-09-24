@@ -15,7 +15,7 @@ const assets = [
   {id:"data-analysis", queries:["data analysis computer screen","data visualization laptop","computer data analysis"], filename:"data-analysis.jpg"},
   {id:"ai-computer", queries:["artificial intelligence computer","AI technology computer screen","machine learning computer"], filename:"ai-computer.jpg"},
   {id:"robot-human-computer", queries:["human robot computer technology","robot hand computer","human computer interaction technology"], filename:"robot-human-computer.jpg"},
-  {id:"technology-workspace", queries:["modern technology workspace laptop","computer workspace technology","digital workspace computer"], filename:"technology workspace computer"], filename:"technology-workspace.jpg"},
+  {id:"technology-workspace", queries:["modern technology workspace laptop","computer workspace technology","digital workspace computer"], filename:"technology-workspace.jpg"},
 ];
 
 function clean(value) {
