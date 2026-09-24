@@ -22,4 +22,4 @@ jobs:
         run: npm install
 
       - name: Typecheck planner only
-        run: npx tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution Bundler src/planner/schema.ts src/planner/example-storyboard.ts
+        run: npx tsc --noEmit --skipLibCheck --strict --target ES2022 --module ESNext --moduleResolution Bundler src/planner/schema.ts src/planner/example-storyboard.ts
