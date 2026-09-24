@@ -1,3 +1,4 @@
+import { searchArchive } from './search-archive.mjs';
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
