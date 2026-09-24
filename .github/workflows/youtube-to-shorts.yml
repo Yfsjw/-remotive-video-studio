@@ -13,7 +13,7 @@ on:
       clips:
         description: "Number of Shorts to create"
         required: true
-        default: "1"
+        default: "5"
         type: string
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
 
       - name: Diagnose and download source
         env:
-          SOURCE_URL: ${{ inputs.youtube_url || 'https://media.w3.org/2010/05/sintel/trailer.mp4' }}
+          SOURCE_URL: ${{ inputs.youtube_url || 'https://youtu.be/5p-sq8v3OXw?si=TYtkMQ6vzEFNY2Hj' }}
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -102,7 +102,7 @@ jobs:
 
       - name: Select and render Shorts
         env:
-          CLIP_COUNT: ${{ inputs.clips || '1' }}
+          CLIP_COUNT: ${{ inputs.clips || '5' }}
         run: |
           python3 scripts/youtube_to_shorts.py \
             --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)" \
