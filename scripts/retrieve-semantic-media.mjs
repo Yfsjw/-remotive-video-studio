@@ -73,11 +73,11 @@ function usable(x,used) {
     !!ii.url &&
     (mediaType === "VIDEO" || mime.startsWith("video/") || videoExt) &&
     Number(ii.size||0)>0 &&
-    Number(ii.size||0)<=180_000_000 &&
+    Number(ii.size||0)<=80_000_000 &&
     !used.has(titleOf(x));
 }
 
-const BAD_WORDS = ["suicide","death","war","military","football","soccer","porn","sex","religion","politician","election","protest","accident","crime","disaster","animal","bird","cat","dog"];
+const BAD_WORDS = ["suicide","death","war","military","football","soccer","porn","sex","religion","politician","election","politics","protest","accident","crime","disaster","animal","bird","cat","dog"];
 const GOOD_WORDS = ["computer","technology","software","programming","data","server","camera","video","editing","studio","laboratory","electronics","screen","digital","microchip","network","keyboard","recording"];
 
 function score(x,query) {
@@ -153,7 +153,14 @@ async function main() {
         const target=join(MEDIA,filename);
 
         console.log("TRY",beat.id,"=>",titleOf(item));
-        const result=downloadAndNormalize(ii.url,target);
+        let result;
+        try {
+          result=downloadAndNormalize(ii.url,target);
+        } catch (error) {
+          console.log("REJECT DOWNLOAD",titleOf(item),error?.message||error);
+          if(existsSync(target+".download")) unlinkSync(target+".download");
+          continue;
+        }
 
         if(result.ok) {
           chosen={...beat,title:titleOf(item),url:ii.url,
