@@ -85,6 +85,7 @@ const ShotLayer = ({ shot }: { shot: Shot }) => {
 export const ShotBased: React.FC = () => (
   <AbsoluteFill style={{background:"#050505"}}>
     <Audio src={staticFile("voice-shot-test.wav")} volume={1} />
+    <Audio src={staticFile("music-bed.wav")} volume={0.18} />
     {generatedShots.map((shot) => (
       <Sequence key={shot.id} from={shot.from} durationInFrames={shot.duration}>
         <ShotLayer shot={shot} />
