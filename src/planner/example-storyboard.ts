@@ -229,7 +229,7 @@ export const exampleStoryboard: Storyboard = {
       startSeconds: 16.0,
       durationSeconds: 4.4,
       narration: 'Now the agent can use that evidence to improve its answer.',
-      purpose: 'transformation',
+      purpose: 'explain',
       visualStrategy: 'transformation',
       visualType: 'HYBRID',
       assets: [
