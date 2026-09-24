@@ -10,7 +10,7 @@ const beats = [
   { id:"hook", queries:["computer laboratory technology","software developer computer","technology demonstration"], caption:"Most AI videos explain the idea. They rarely show it.", type:"human-action" },
   { id:"model", queries:["video editing timeline","nonlinear video editing","film editor editing"], caption:"The fix is simple: edit in shots, not slides.", type:"process" },
   { id:"narration", queries:["microphone studio recording","podcast recording studio","voice recording"], caption:"Start with the narration.", type:"human-action" },
-  { id:"intent", queries:["software interface computer screen","programming terminal screen","computer programmer"], caption:"Then ask: what should the viewer actually see?", type:"screen" },
+  { id:"intent", queries:["computer screen","laptop screen software","programming computer"], caption:"Then ask: what should the viewer actually see?", type:"screen" },
   { id:"concrete", queries:["computer hardware close up","microchip electronics close up","keyboard typing hands"], caption:"Not a circle. Not a card. A real visual.", type:"close-up" },
   { id:"transition", queries:["technology laboratory","data center corridor","city technology"], caption:"A change of place can carry a transition.", type:"environment" },
   { id:"detail", queries:["server room data center","computer motherboard electronics","semiconductor laboratory"], caption:"A close-up can make the idea feel concrete.", type:"detail" },
