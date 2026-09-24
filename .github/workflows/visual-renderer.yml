@@ -1,0 +1,56 @@
+name: Visual Renderer v1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - visual-renderer-v1
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install dependencies
+        run: |
+          npm install
+          python -m pip install --upgrade pip
+          python -m pip install piper-tts
+      - name: Resolve real visual assets
+        run: node scripts/resolve-planner-assets.mjs
+      - name: Generate US English narration
+        run: |
+          mkdir -p public
+          python -m piper.download_voices --data-dir public en_US-lessac-high
+          cat > planner-script.txt <<'EOF'
+          An AI agent does not need to know everything before it starts. First, it turns the goal into a search task. Then it opens a browser and searches for evidence. It does not just read the page. It selects the information that matters. Now the agent can use that evidence to improve its answer. That is the difference between a model that only answers and an agent that can act. The tool is what closes the gap between knowledge and action. That is the core idea.
+          EOF
+          python -m piper -m en_US-lessac-high --data-dir public -f public/voice.wav --length_scale 0.84 < planner-script.txt
+          ffmpeg -y -i public/voice.wav -af "apad=pad_dur=30,atrim=0:30,loudnorm=I=-16:TP=-1.5:LRA=11" public/voice-normalized.wav
+          mv public/voice-normalized.wav public/voice.wav
+      - name: Render VisualPlanner MP4
+        run: npx remotion render src/planner-entry.tsx VisualPlanner out/visual-planner-v1.mp4 --concurrency=2
+      - name: Verify MP4
+        run: |
+          test -s out/visual-planner-v1.mp4
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,codec_name -of default=nw=1 out/visual-planner-v1.mp4
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate -of default=nw=1 out/visual-planner-v1.mp4
+      - name: Upload rendered video
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-planner-v1
+          path: |
+            out/visual-planner-v1.mp4
+            public/planner-assets/manifest.json
+          if-no-files-found: error
