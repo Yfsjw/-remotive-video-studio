@@ -107,6 +107,45 @@ function probeDuration(file) {
   }
 }
 
+function downloadRaw(url,target) {
+  if(existsSync(target)) unlinkSync(target);
+  execFileSync("curl",[
+    "-L","--fail","--retry","2","--retry-delay","2","--retry-max-time","20",
+    "--connect-timeout","15","--max-time","90",url,"-o",target
+  ],{stdio:"inherit"});
+  const duration=probeDuration(target);
+  if(!Number.isFinite(duration) || duration < 14) {
+    if(existsSync(target)) unlinkSync(target);
+    return 0;
+  }
+  return duration;
+}
+
+function extractFrame(video,target) {
+  if(existsSync(target)) unlinkSync(target);
+  try {
+    execFileSync("ffmpeg",["-y","-ss","5","-i",video,"-frames:v","1","-vf","scale=512:-2",target],{stdio:"ignore"});
+    return existsSync(target);
+  } catch {
+    return false;
+  }
+}
+
+function rankWithClip(items) {
+  if(!items.length) return [];
+  try {
+    const raw=execFileSync("python",["scripts/clip-rank.py"],{
+      input:JSON.stringify(items),
+      encoding:"utf8",
+      maxBuffer:1024*1024
+    });
+    return JSON.parse(raw);
+  } catch(error) {
+    console.log("CLIP RANK FALLBACK",error?.message||error);
+    return items.map((x,i)=>({id:x.id,score:x.lexical ?? (items.length-i)}));
+  }
+}
+
 function downloadAndNormalize(url,target) {
   const tmp=target+".download";
   if(existsSync(tmp)) unlinkSync(tmp);
@@ -141,46 +180,72 @@ async function main() {
       const candidates=(await searchCommons(q))
         .filter(x=>usable(x,used))
         .map(x=>({x,score:score(x,q)}))
-        .filter(v=>v.score >= 5)
+        .filter(v=>v.score >= 0)
         .sort((a,b)=>b.score-a.score)
-        .map(v=>v.x);
+        .slice(0,3);
 
       console.log("SEARCH",beat.id,q,"candidates",candidates.length);
+      if(!candidates.length) continue;
 
-      for(const item of candidates.slice(0,12)) {
+      const batch=[], temp=[];
+      for(let i=0;i<candidates.length;i++) {
+        const item=candidates[i].x;
         const ii=item.imageinfo[0];
+        const base=join(MEDIA,".candidate-"+safeName(titleOf(item))+"-"+i);
+        const raw=base+".source";
+        const frame=base+".jpg";
+        try {
+          const d=downloadRaw(ii.url,raw);
+          if(!d) continue;
+          if(!extractFrame(raw,frame)) continue;
+          const id=String(i)+"-"+safeName(titleOf(item));
+          batch.push({id,image:frame,text:beat.caption,lexical:candidates[i].score,title:titleOf(item)});
+          temp.push({raw,frame,item,d,id});
+        } catch(error) {
+          console.log("CANDIDATE FAILED",titleOf(item),error?.message||error);
+        }
+      }
+
+      const ranked=rankWithClip(batch)
+        .map(r=>({...r,ref:batch.find(b=>b.id===r.id)}))
+        .filter(r=>r.ref)
+        .sort((a,b)=>b.score-a.score);
+
+      for(const rnk of ranked) {
+        const ref=rnk.ref;
+        const t=temp.find(x=>x.id===rnk.id);
+        if(!t) continue;
+        const item=t.item, ii=item.imageinfo[0];
         const filename=String(selected.length+1).padStart(2,"0")+"-"+safeName(titleOf(item))+".mp4";
         const target=join(MEDIA,filename);
-
-        console.log("TRY",beat.id,"=>",titleOf(item));
-        let result;
+        console.log("CLIP SELECT",beat.id,"=>",titleOf(item),"score",Number(rnk.score).toFixed(4));
         try {
-          result=downloadAndNormalize(ii.url,target);
-        } catch (error) {
+          const result=downloadAndNormalize(ii.url,target);
+          if(result.ok) {
+            chosen={...beat,title:titleOf(item),url:ii.url,
+              license:ii.extmetadata?.LicenseShortName?.value||"See Commons file page",
+              sourcePage:"https://commons.wikimedia.org/wiki/"+encodeURIComponent(String(item.title).replace(/ /g,"_")),
+              sourceDuration:result.duration,
+              filename
+            };
+            break;
+          }
+        } catch(error) {
           console.log("REJECT DOWNLOAD",titleOf(item),error?.message||error);
           if(existsSync(target+".download")) unlinkSync(target+".download");
-          continue;
         }
+      }
 
-        if(result.ok) {
-          chosen={...beat,title:titleOf(item),url:ii.url,
-            license:ii.extmetadata?.LicenseShortName?.value||"See Commons file page",
-            sourcePage:"https://commons.wikimedia.org/wiki/"+encodeURIComponent(String(item.title).replace(/ /g,"_")),
-            sourceDuration:result.duration,
-            filename
-          };
-          break;
-        }
-
-        console.log("REJECT",titleOf(item),"duration",result.duration);
-        if(existsSync(target)) unlinkSync(target);
+      for(const t of temp) {
+        if(existsSync(t.raw)) unlinkSync(t.raw);
+        if(existsSync(t.frame)) unlinkSync(t.frame);
       }
 
       if(chosen) break;
     }
 
     if(!chosen) {
-      throw new Error("No distinct usable video >=14s for beat "+beat.id+" after all fallback queries");
+      throw new Error("No distinct usable video >=14s for beat "+beat.id+" after semantic retrieval");
     }
 
     used.add(chosen.title);
