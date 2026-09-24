@@ -27,7 +27,7 @@ jobs:
       - name: Install media tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg cmake build-essential python3
+          sudo apt-get install -y ffmpeg cmake build-essential python3 nodejs
 
       - name: Download source video
         env:
@@ -39,7 +39,14 @@ jobs:
           mkdir -p work/source work/audio out
           yt-dlp \
             --no-playlist \
-            --format "bv*[height<=1080]+ba/b[height<=1080]/b" \
+            --retries 3 \
+            --fragment-retries 3 \
+            --extractor-retries 3 \
+            --socket-timeout 30 \
+            --force-ipv4 \
+            --js-runtimes node \
+            --remote-components ejs:github \
+            --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
             --merge-output-format mp4 \
             --output "work/source/source.%(ext)s" \
             "$YOUTUBE_URL"
