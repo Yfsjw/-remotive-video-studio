@@ -1,0 +1,78 @@
+name: Render Editorial NASA Tech Short
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - visual-shot-planner-v2
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: |
+          npm install
+          python -m pip install --upgrade pip
+          python -m pip install piper-tts
+
+      - name: Build curated real-footage editorial plan
+        run: node scripts/build-editorial-demo-v2.mjs
+
+      - name: Validate sources
+        run: |
+          test -s public/media-manifest.json
+          COUNT=$(node -e "const x=require('./public/media-manifest.json'); console.log(new Set(x.map(v=>v.title)).size)")
+          echo "Distinct NASA source videos: $COUNT"
+          test "$COUNT" -ge 4
+          test $(find public/media -maxdepth 1 -type f -name "*.mp4" | wc -l) -ge 4
+
+      - name: Generate narration
+        run: |
+          mkdir -p public
+          python -m piper.download_voices --data-dir public en_US-lessac-high
+          cat > script.txt <<'EOF'
+          The biggest upgrade in space computing wasn't always a bigger computer. Sometimes, it was making the electronics smaller. NASA Goddard developed microelectronics and miniaturized processors for spacecraft. That meant more computing could fit into the same limited space. But raw computing power is only useful if humans can understand the data. That's why NASA turns huge datasets into moving maps, simulations, and visual stories. The result isn't just more data. It's more information we can actually see.
+          EOF
+          python -m piper -m en_US-lessac-high --data-dir public -f narration.wav --length_scale 1.0 < script.txt
+          ffmpeg -y -i narration.wav -af "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-42dB:stop_periods=-1:stop_duration=0.15:stop_threshold=-38dB,apad=pad_dur=45,atrim=0:45" -ar 22050 -ac 1 public/voice-shot-test.wav
+
+      - name: Generate subtle ambient bed
+        run: |
+          ffmpeg -y -f lavfi -i "sine=frequency=110:duration=45" -f lavfi -i "sine=frequency=165:duration=45" -f lavfi -i "sine=frequency=220:duration=45"             -filter_complex "[0:a]volume=0.10[a];[1:a]volume=0.045[b];[2:a]volume=0.018[c];[a][b][c]amix=inputs=3:duration=longest,lowpass=f=900,afade=t=in:st=0:d=2,afade=t=out:st=40:d=5,volume=0.65"             -ar 44100 -ac 2 public/music-bed.wav
+
+      - name: Typecheck
+        run: npm run check
+
+      - name: Render
+        run: npx remotion render src/index.tsx ShotBased out/editorial-nasa-tech-short.mp4 --concurrency=2
+
+      - name: Verify output
+        run: |
+          test -s out/editorial-nasa-tech-short.mp4
+          ffprobe -v error -show_entries format=duration -show_entries stream=width,height,r_frame_rate,codec_name -of default=nw=1 out/editorial-nasa-tech-short.mp4
+
+      - name: Upload finished MP4
+        uses: actions/upload-artifact@v4
+        with:
+          name: editorial-nasa-tech-short
+          path: |
+            out/editorial-nasa-tech-short.mp4
+            public/media-manifest.json
+          if-no-files-found: error
