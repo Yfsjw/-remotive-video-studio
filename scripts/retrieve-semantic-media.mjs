@@ -25,7 +25,7 @@ async function searchCommons(query) {
   const url = new URL("https://commons.wikimedia.org/w/api.php");
   for (const [k,v] of Object.entries({
     action:"query", format:"json", generator:"search", gsrnamespace:"6",
-    gsrsearch:query, gsrlimit:"50", prop:"imageinfo",
+    gsrsearch:"filetype:video "+query, gsrlimit:"50", prop:"imageinfo",
     iiprop:"url|mime|size|duration|extmetadata"
   })) url.searchParams.set(k,v);
   const res = await fetch(url,{headers});
