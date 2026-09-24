@@ -33,8 +33,14 @@ const Caption = ({ shot }: { shot: Shot }) => {
   const opacity=Math.min(enter,exit);
 
   let cursor=0;
+  const topCaption = shot.type === "data" || shot.type === "reveal" || shot.type === "concept";
   return (
-    <AbsoluteFill style={{justifyContent:"flex-end",alignItems:"center",padding:"0 62px 178px",opacity}}>
+    <AbsoluteFill style={{
+      justifyContent:topCaption ? "flex-start" : "flex-end",
+      alignItems:"center",
+      padding:topCaption ? "190px 62px 0" : "0 62px 178px",
+      opacity
+    }}>
       <div style={{
         maxWidth:930,
         display:"flex",
@@ -63,8 +69,8 @@ const Caption = ({ shot }: { shot: Shot }) => {
 const ShotLayer = ({ shot }: { shot: Shot }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const intro = interpolate(frame,[0,6],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
-  const outro = interpolate(frame,[shot.duration-6,shot.duration],[1,0],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
+  const intro = interpolate(frame,[0,2],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
+  const outro = interpolate(frame,[shot.duration-4,shot.duration],[1,0],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
   const zoom = 1.025 + (frame / Math.max(1,shot.duration)) * 0.055;
 
   return (
