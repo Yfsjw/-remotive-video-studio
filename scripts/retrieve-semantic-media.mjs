@@ -21,7 +21,7 @@ const beats = [
 
 const headers = { "User-Agent":"RemotiveVideoStudio/0.3", "Accept":"application/json" };
 
-async function searchCommons(query) {
+async function searchCommons(query, attempt = 1) {
   const url = new URL("https://commons.wikimedia.org/w/api.php");
   for (const [k,v] of Object.entries({
     action:"query",
@@ -29,15 +29,33 @@ async function searchCommons(query) {
     generator:"search",
     gsrnamespace:"6",
     gsrsearch:"filetype:video " + query,
-    gsrlimit:"50",
+    gsrlimit:"20",
     prop:"imageinfo",
     iiprop:"url|mime|size|mediatype|extmetadata"
   })) url.searchParams.set(k,v);
 
-  const res = await fetch(url,{headers});
-  if(!res.ok) throw new Error("Commons HTTP " + res.status + " for " + query);
-  const data = await res.json();
-  return Object.values(data.query?.pages ?? {});
+  try {
+    const res = await fetch(url,{headers, signal:AbortSignal.timeout(20000)});
+    if(!res.ok) {
+      if((res.status === 429 || res.status >= 500) && attempt < 4) {
+        const delay = Math.min(8000, 1000 * 2 ** (attempt - 1));
+        console.log("RETRY SEARCH", query, "HTTP", res.status, "after", delay, "ms");
+        await new Promise(r => setTimeout(r, delay));
+        return searchCommons(query, attempt + 1);
+      }
+      throw new Error("Commons HTTP " + res.status + " for " + query);
+    }
+    const data = await res.json();
+    return Object.values(data.query?.pages ?? {});
+  } catch (error) {
+    if(attempt < 4) {
+      const delay = Math.min(8000, 1000 * 2 ** (attempt - 1));
+      console.log("RETRY SEARCH", query, "error", error?.message || error, "after", delay, "ms");
+      await new Promise(r => setTimeout(r, delay));
+      return searchCommons(query, attempt + 1);
+    }
+    throw error;
+  }
 }
 
 function titleOf(x) {
@@ -83,8 +101,8 @@ function downloadAndNormalize(url,target) {
   const tmp=target+".download";
   if(existsSync(tmp)) unlinkSync(tmp);
   execFileSync("curl",[
-    "-L","--fail","--retry","3","--connect-timeout","20",
-    "--max-time","120",url,"-o",tmp
+    "-L","--fail","--retry","3","--retry-delay","2","--retry-max-time","30",
+    "--connect-timeout","20","--max-time","120",url,"-o",tmp
   ],{stdio:"inherit"});
 
   const sourceDuration=probeDuration(tmp);
