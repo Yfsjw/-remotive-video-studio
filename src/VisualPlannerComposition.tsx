@@ -8,7 +8,7 @@ const TEXT = "#f5f7fa";
 const MUTED = "rgba(245,247,250,.68)";
 const ACCENT = "#7dd3fc";
 
-const asset = (id:string) => staticFile("planner-assets/" + id);
+// Asset contract: resolve-planner-assets.mjs writes every resolved asset as planner-assets/<id>.jpg.\n// Keep the renderer on that concrete file contract; never reference extensionless asset IDs.\nconst asset = (id:string) => staticFile("planner-assets/" + id + ".jpg");
 
 const Photo: React.FC<{
   id:string;
