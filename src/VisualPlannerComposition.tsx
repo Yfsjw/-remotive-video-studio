@@ -8,8 +8,6 @@ const TEXT = "#f5f7fa";
 const MUTED = "rgba(245,247,250,.68)";
 const ACCENT = "#7dd3fc";
 
-// Asset contract: resolve-planner-assets.mjs writes every resolved asset as planner-assets/<id>.jpg.\n// Keep the renderer on that concrete file contract; never reference extensionless asset IDs.\nconst asset = (id:string) => staticFile("planner-assets/" + id + ".jpg");
-
 const Photo: React.FC<{
   id:string;
   startScale?:number;
@@ -22,7 +20,7 @@ const Photo: React.FC<{
   const scale = interpolate(frame,[0,120],[startScale,endScale],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
   const driftX = interpolate(frame,[0,120],[x,x + 18],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
   const driftY = interpolate(frame,[0,120],[y,y - 12],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
-  return <Img src={asset(id)} style={{
+  return <Img src={staticFile("planner-assets/" + id + ".jpg")} style={{
     position:"absolute", inset:-70, width:"calc(100% + 140px)", height:"calc(100% + 140px)",
     objectFit:"cover", transform:"translate(" + driftX + "px," + driftY + "px) scale(" + scale + ")",
     opacity
