@@ -1,0 +1,77 @@
+name: Agent Video Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: "Verified stable HTTP(S) MP4 source URL"
+        required: true
+        type: string
+      clips:
+        description: "Number of Shorts"
+        required: false
+        default: "5"
+        type: string
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file jq
+
+      - name: Verify source
+        env:
+          SOURCE_URL: ${{ inputs.source_url }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p work/source work/audio out
+          [[ "$SOURCE_URL" =~ ^https?:// ]] || { echo "Invalid HTTP(S) source URL"; exit 2; }
+          curl -4 -L --fail --show-error --retry 5 --retry-delay 3             --connect-timeout 30 --max-time 1800 -A "Mozilla/5.0"             "$SOURCE_URL" -o work/source/source.mp4
+          test -s work/source/source.mp4
+          ffprobe -v error -show_entries format=duration,size,format_name             -of default=nw=1 work/source/source.mp4
+
+      - name: Build whisper.cpp
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git work/whisper.cpp
+          cmake -S work/whisper.cpp -B work/whisper.cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build work/whisper.cpp/build --config Release -j 2
+          bash work/whisper.cpp/models/download-ggml-model.sh base.en
+
+      - name: Transcribe
+        run: |
+          ffmpeg -y -i work/source/source.mp4 -vn -ac 1 -ar 16000 -c:a pcm_s16le work/audio/source.wav
+          work/whisper.cpp/build/bin/whisper-cli             -m work/whisper.cpp/models/ggml-base.en.bin             -f work/audio/source.wav -l en -ng -ml 1 -osrt -ojf             -of work/audio/transcript
+          test -s work/audio/transcript.srt
+          test -s work/audio/transcript.json
+
+      - name: Select and render
+        env:
+          CLIP_COUNT: ${{ inputs.clips || '5' }}
+        run: |
+          python3 scripts/youtube_to_shorts.py             --video work/source/source.mp4             --srt work/audio/transcript.srt             --count "$CLIP_COUNT"             --plan data/clip_plan.json             --out out
+
+      - name: Quality control
+        run: |
+          set -Eeuo pipefail
+          COUNT=$(find out -maxdepth 1 -type f -name 'short_*.mp4' | wc -l)
+          test "$COUNT" -ge 1
+          for f in out/short_*.mp4; do
+            echo "=== $f ==="
+            ffprobe -v error               -show_entries format=duration,size               -show_entries stream=width,height,codec_name,r_frame_rate               -of default=nw=1 "$f"
+            test -s "$f"
+          done
+
+      - name: Upload verified artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-video-pipeline
+          path: out/short_*.mp4
+          if-no-files-found: error
+          retention-days: 3
