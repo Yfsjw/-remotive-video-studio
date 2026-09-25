@@ -10,7 +10,7 @@ jobs:
       - name: Inspect Zolotube source
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 curl ffmpeg
+          sudo apt-get install -y python3 curl ffmpeg nodejs npm
           mkdir -p work/source
           curl -L --retry 3 --connect-timeout 15 -A "Mozilla/5.0" "https://zolotube.com/watch?v=5p-sq8v3OXw" -o work/source/zolotube.html
           python3 - <<'PY'
@@ -24,15 +24,24 @@ jobs:
               print(u)
           Path("work/source/zolotube_urls.txt").write_text("\n".join(urls))
           PY
+          if [ ! -s work/source/zolotube_urls.txt ]; then
+            echo "No MP4 in raw HTML. Inspecting the rendered page with Chromium."
+            npm init -y >/dev/null 2>&1
+            npm install --no-audit --no-fund playwright >/dev/null 2>&1
+            npx playwright install --with-deps chromium >/dev/null 2>&1
+            node scripts/inspect_zolotube.mjs "https://zolotube.com/watch?v=5p-sq8v3OXw" | sed -n '/MP4_CANDIDATES/,/END_MP4_CANDIDATES/p' | sed '1d;$d' > work/source/rendered_mp4_urls.txt
+            echo "Rendered MP4 candidates: $(wc -l < work/source/rendered_mp4_urls.txt)"
+          fi
           if [ -s work/source/zolotube_urls.txt ]; then
             head -n 1 work/source/zolotube_urls.txt | xargs -I{} curl -L --retry 3 --connect-timeout 15 -A "Mozilla/5.0" "{}" -o work/source/source.mp4
-            file work/source/source.mp4
-            ffprobe -v error -show_entries format=duration,size -of default=nw=1 work/source/source.mp4
+          elif [ -s work/source/rendered_mp4_urls.txt ]; then
+            head -n 1 work/source/rendered_mp4_urls.txt | xargs -I{} curl -L --retry 3 --connect-timeout 15 -A "Mozilla/5.0" "{}" -o work/source/source.mp4
           else
-            echo "No direct MP4 URL exposed in Zolotube HTML; testing existing fallback."
+            echo "Zolotube browser inspection found no direct MP4; testing existing fallback."
             VIDEO_ID=5p-sq8v3OXw python3 scripts/download_youtube_proxy.py
-            ffprobe -v error -show_entries format=duration,size -of default=nw=1 work/source/source.mp4
           fi
+          file work/source/source.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=nw=1 work/source/source.mp4
       - name: Upload source test
         uses: actions/upload-artifact@v4
         if: always()
