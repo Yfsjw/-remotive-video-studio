@@ -24,7 +24,25 @@ jobs:
               print(u)
           Path("work/source/zolotube_urls.txt").write_text("\n".join(urls))
           PY
-          if [ ! -s work/source/zolotube_urls.txt ]; then
+          echo "Testing self-hosted Cobalt gateway first." 
+          COBALT_RESPONSE="$(curl -4 -sS --fail-with-body --connect-timeout 30 --max-time 120 \
+            -H "Accept: application/json" -H "Content-Type: application/json" -X POST \
+            "https://yasser-cobalt-source-v4.onrender.com/" \
+            --data "$(python3 - <<'PY'
+import json
+print(json.dumps({"url":"https://youtu.be/5p-sq8v3OXw?si=TYtkMQ6vzEFNY2Hj","downloadMode":"auto","videoQuality":"720","youtubeVideoCodec":"h264","youtubeVideoContainer":"mp4"}))
+PY
+)")" || true
+          echo "$COBALT_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$COBALT_RESPONSE"
+          COBALT_URL="$(echo "$COBALT_RESPONSE" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("url",""))' 2>/dev/null || true)"
+          if [ -n "$COBALT_URL" ]; then
+            echo "Self-hosted Cobalt returned a media URL."
+            curl -4 -L --fail --show-error --retry 3 --connect-timeout 30 --max-time 900 -A "Mozilla/5.0" "$COBALT_URL" -o work/source/source.mp4
+          else
+            echo "Self-hosted Cobalt did not return a media URL; continue with mirror inspection."
+          fi
+          if [ ! -s work/source/source.mp4 ]; then
+
             echo "No MP4 in raw HTML. Inspecting the rendered page with Chromium."
             npm init -y >/dev/null 2>&1
             npm install --no-audit --no-fund playwright >/dev/null 2>&1
@@ -32,7 +50,9 @@ jobs:
             node scripts/inspect_zolotube.mjs "https://zolotube.com/watch?v=5p-sq8v3OXw" | sed -n '/MP4_CANDIDATES/,/END_MP4_CANDIDATES/p' | sed '1d;$d' > work/source/rendered_mp4_urls.txt
             echo "Rendered MP4 candidates: $(wc -l < work/source/rendered_mp4_urls.txt)"
           fi
-          if [ -s work/source/zolotube_urls.txt ]; then
+          if [ -s work/source/source.mp4 ]; then
+            echo "Source acquired through self-hosted Cobalt."
+          elif [ -s work/source/zolotube_urls.txt ]; then
             head -n 1 work/source/zolotube_urls.txt | xargs -I{} curl -L --retry 3 --connect-timeout 15 -A "Mozilla/5.0" "{}" -o work/source/source.mp4
           elif [ -s work/source/rendered_mp4_urls.txt ]; then
             head -n 1 work/source/rendered_mp4_urls.txt | xargs -I{} curl -L --retry 3 --connect-timeout 15 -A "Mozilla/5.0" "{}" -o work/source/source.mp4
