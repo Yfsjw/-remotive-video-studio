@@ -3,9 +3,14 @@ name: Agent Video Pipeline
 on:
   workflow_dispatch:
     inputs:
-      source_url:
-        description: "Verified stable HTTP(S) MP4 source URL"
+      video_url:
+        description: "YouTube URL identifying the source video"
         required: true
+        type: string
+      source_url:
+        description: "Optional direct MP4 URL if one is already known"
+        required: false
+        default: ""
         type: string
       clips:
         description: "Number of Shorts"
@@ -25,15 +30,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg cmake build-essential python3 curl file jq fonts-dejavu-core
 
-      - name: Verify source
+      - name: Resolve source and transcript
         env:
-          SOURCE_URL: ${{ inputs.source_url }}
+          VIDEO_URL: ${{ inputs.video_url }}
+          DIRECT_SOURCE_URL: ${{ inputs.source_url }}
+          MEDIA_RESOLVER_ENDPOINTS: ${{ vars.MEDIA_RESOLVER_ENDPOINTS }}
         run: |
           set -Eeuo pipefail
           mkdir -p work/source work/audio out work/assets
-          [[ "$SOURCE_URL" =~ ^https?:// ]] || { echo "Invalid HTTP(S) source URL"; exit 2; }
-          curl -4 -L --fail --show-error --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 1800             -A "Mozilla/5.0" "$SOURCE_URL" -o work/source/source.mp4
-          test -s work/source/source.mp4
+          URL="$VIDEO_URL"
+          if [[ -n "$DIRECT_SOURCE_URL" ]]; then URL="$DIRECT_SOURCE_URL"; fi
+          python3 scripts/source_resolver.py             --url "$URL"             --media-out work/source/source.mp4             --transcript-out work/audio/remote_transcript.txt             --report work/source/resolution.json || true
+          cat work/source/resolution.json
+          test -s work/audio/remote_transcript.txt || echo "No remote transcript; Whisper will be used if media is available."
+          test -s work/source/source.mp4 || {
+            echo "::error::No verified media source was resolved."
+            echo "The pipeline deliberately stops here instead of pretending that a transcript is a video."
+            exit 3
+          }
           ffprobe -v error -show_entries format=duration,size,format_name -of default=nw=1 work/source/source.mp4
 
       - name: Build whisper.cpp
@@ -86,5 +100,7 @@ jobs:
             out/short_*.mp4
             work/storyboard.json
             work/assets/manifest.json
+            work/source/resolution.json
+            work/audio/remote_transcript.txt
           if-no-files-found: error
           retention-days: 3
