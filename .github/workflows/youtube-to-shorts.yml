@@ -39,7 +39,30 @@ jobs:
           echo "SOURCE_URL=$SOURCE_URL"
 
           if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
-            echo "YouTube source: trying self-hosted Cobalt first."
+            echo "YouTube source: trying a public mirror extractor first, then Cobalt/yt-dlp."
+
+            VIDEO_ID="$(python3 -c 'import re,sys; u=sys.argv[1]; m=re.search(r"(?:v=|youtu\\.be/)([A-Za-z0-9_-]{11})",u); print(m.group(1) if m else "")' "$SOURCE_URL")"
+            if [[ -n "$VIDEO_ID" ]]; then
+              MIRROR_PAGE="https://zolotube.com/watch?v=$VIDEO_ID"
+              set +e
+              MIRROR_HTML="$(curl -4 -sS -L --retry 2 --connect-timeout 20 --max-time 60 -A "Mozilla/5.0" "$MIRROR_PAGE" 2>&1)"
+              MIRROR_STATUS=$?
+              set -e
+              echo "Zolotube mirror HTTP/curl status: $MIRROR_STATUS"
+              if [[ $MIRROR_STATUS -eq 0 ]]; then
+                MIRROR_MP4="$(printf '%s' "$MIRROR_HTML" | python3 -c 'import re,sys,html; s=html.unescape(sys.stdin.read()); xs=re.findall(r"(?:href|src)\\s*=\\s*["'"'"']([^"'"'"']+\\.mp4(?:\\?[^"'"'"']*)?)["'"'"']',s,re.I); print(next((x for x in xs if "720" in x.lower()), xs[0] if xs else ""))')"
+                if [[ -n "$MIRROR_MP4" ]]; then
+                  if [[ "$MIRROR_MP4" != http://* && "$MIRROR_MP4" != https://* ]]; then MIRROR_MP4="https://zolotube.com$MIRROR_MP4"; fi
+                  echo "Zolotube returned a direct MP4; downloading it."
+                  curl -4 -L --fail --show-error --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 900 -A "Mozilla/5.0" "$MIRROR_MP4" -o work/source/source.mp4
+                else
+                  echo "Zolotube page had no directly extractable MP4 link."
+                fi
+              fi
+            fi
+
+            if [[ ! -s work/source/source.mp4 ]]; then
+              echo "Zolotube did not yield the source; trying self-hosted Cobalt."
             COBALT_URL="https://cobaltapi.cjs.nz"
             set +e
             COBALT_RESPONSE="$(curl -4 -sS --fail-with-body --retry 2 --connect-timeout 30 --max-time 120 \
@@ -98,6 +121,7 @@ jobs:
                 echo "yt-dlp was blocked; using alternate public source APIs."
                 SOURCE_URL="$SOURCE_URL" python3 scripts/download_youtube_proxy.py
               fi
+            fi
             fi
           else
             curl -4 -L --fail --show-error --retry 5 --retry-delay 3               --connect-timeout 30 --max-time 900 -A "Mozilla/5.0"               "$SOURCE_URL" -o work/source/source.mp4
