@@ -47,9 +47,21 @@ jobs:
           curl -4 -sSIL --max-time 60 -A "Mozilla/5.0" "$SOURCE_URL" | sed -n '1,40p'
 
           if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
-            python3 -m pip install --user -U yt-dlp
+            python3 -m pip install --user -U "yt-dlp[default]" bgutil-ytdlp-pot-provider
             export PATH="$HOME/.local/bin:$PATH"
+            node --version
             yt-dlp --version
+            rm -rf work/bgutil-ytdlp-pot-provider
+            git clone --depth 1 --branch 2.0.0 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git work/bgutil-ytdlp-pot-provider
+            cd work/bgutil-ytdlp-pot-provider/server
+            npm ci
+            npx tsc
+            cd "$GITHUB_WORKSPACE"
+            test -s work/bgutil-ytdlp-pot-provider/server/build/generate_once.js
+            yt-dlp -v --simulate --no-playlist \
+              --js-runtimes node \
+              --extractor-args "youtubepot-bgutilscript:script_path=$GITHUB_WORKSPACE/work/bgutil-ytdlp-pot-provider/server/build/generate_once.js" \
+              "$SOURCE_URL" 2>&1 | tee work/yt-dlp-probe.log
             yt-dlp \
               --no-playlist \
               --retries 3 \
@@ -57,6 +69,8 @@ jobs:
               --extractor-retries 3 \
               --socket-timeout 30 \
               --force-ipv4 \
+              --js-runtimes node \
+              --extractor-args "youtubepot-bgutilscript:script_path=$GITHUB_WORKSPACE/work/bgutil-ytdlp-pot-provider/server/build/generate_once.js" \
               --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
               --merge-output-format mp4 \
               --output "work/source/source.%(ext)s" \
