@@ -174,7 +174,7 @@ PY
         env:
           CLIP_COUNT: ${{ inputs.clips || '5' }}
         run: |
-          python3 scripts/youtube_to_shorts.py             --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"             --srt work/audio/transcript.srt             --count "$CLIP_COUNT"             --out out
+          python3 scripts/youtube_to_shorts.py             --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"             --srt work/audio/transcript.srt             --count "$CLIP_COUNT"             --plan data/clip_plan.json             --out out
 
       - name: Verify outputs
         run: |
