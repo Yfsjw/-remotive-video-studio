@@ -1,0 +1,5 @@
+Flask>=3.1,<4
+gunicorn>=23,<24
+yt-dlp>=2026.8.0
+yt-dlp-getpot-wpc>=1.0.0
+playwright>=1.55,<2
