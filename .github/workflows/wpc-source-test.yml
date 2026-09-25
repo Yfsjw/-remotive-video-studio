@@ -12,6 +12,9 @@ on:
         default: "https://youtu.be/5p-sq8v3OXw"
         type: string
 
+env:
+  YOUTUBE_URL: \${{ inputs.youtube_url || 'https://youtu.be/5p-sq8v3OXw' }}
+
 jobs:
   test-wpc:
     runs-on: ubuntu-latest
@@ -32,25 +35,32 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install --upgrade yt-dlp yt-dlp-getpot-wpc
           yt-dlp --version
-          yt-dlp -v --simulate "${{ inputs.youtube_url }}" 2>&1 | tee wpc-diagnostic.txt || true
+          yt-dlp -v --simulate "$YOUTUBE_URL" 2>&1 | tee wpc-diagnostic.txt || true
           grep -E "PO Token Providers|wpc-" wpc-diagnostic.txt || true
 
       - name: Download through WPC provider
-        env:
-          YOUTUBE_URL: ${{ inputs.youtube_url }}
         run: |
           set -Eeuo pipefail
           mkdir -p work/source
           CHROME="$(command -v chromium)"
           echo "Chrome: $CHROME"
-          yt-dlp -v --no-playlist             --format "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"             --merge-output-format mp4             --extractor-args "youtubepot-wpc:browser_path=$CHROME"             --output "work/source/source.%(ext)s"             "$YOUTUBE_URL" 2>&1 | tee wpc-download.log
+          echo "Source: $YOUTUBE_URL"
+          yt-dlp -v --no-playlist \
+            --format "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" \
+            --merge-output-format mp4 \
+            --extractor-args "youtubepot-wpc:browser_path=$CHROME" \
+            --output "work/source/source.%(ext)s" \
+            "$YOUTUBE_URL" 2>&1 | tee wpc-download.log
 
       - name: Validate source
         run: |
           set -Eeuo pipefail
           test -s work/source/source.mp4
           file work/source/source.mp4
-          ffprobe -v error             -show_entries format=duration,size,format_name             -show_entries stream=width,height,codec_name             -of default=nw=1 work/source/source.mp4
+          ffprobe -v error \
+            -show_entries format=duration,size,format_name \
+            -show_entries stream=width,height,codec_name \
+            -of default=nw=1 work/source/source.mp4
 
       - name: Upload diagnostic/source artifact
         if: always()
