@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       source_url:
-        description: "Direct MP4 URL or stable public file URL. YouTube URLs are intentionally not accepted here."
+        description: "Direct MP4 URL, or a GitHub Release asset URL. YouTube URLs are intentionally not accepted."
         required: true
         type: string
       clips:
@@ -38,22 +38,22 @@ jobs:
           mkdir -p work/source work/audio out
           echo "SOURCE_URL=$SOURCE_URL"
 
-          if [[ "$SOURCE_URL" =~ ^https?:// ]] && [[ "$SOURCE_URL" != *youtube.com/* ]] && [[ "$SOURCE_URL" != *youtu.be/* ]]; then
-            echo "Downloading supplied source URL."
-            curl -4 -L --fail --show-error --retry 5 --retry-delay 3 \
-              --connect-timeout 30 --max-time 1800 -A "Mozilla/5.0" \
-              "$SOURCE_URL" -o work/source/source.mp4
-          else
-            echo "ERROR: YouTube URLs are not accepted by the production pipeline."
-            echo "Supply a direct/stable MP4 URL instead."
+          if [[ ! "$SOURCE_URL" =~ ^https?:// ]]; then
+            echo "ERROR: source_url must be an HTTP(S) URL."
             exit 2
           fi
 
-          SOURCE="$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"
-          test -s "$SOURCE"
-          file "$SOURCE"
-          ffprobe -v error -show_entries format=duration,size,format_name \
-            -of default=nw=1 "$SOURCE"
+          if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
+            echo "ERROR: YouTube URLs are not accepted by the production pipeline."
+            exit 2
+          fi
+
+          echo "Downloading supplied stable source URL."
+          curl -4 -L --fail --show-error --retry 5 --retry-delay 3             --connect-timeout 30 --max-time 1800 -A "Mozilla/5.0"             "$SOURCE_URL" -o work/source/source.mp4
+
+          test -s work/source/source.mp4
+          file work/source/source.mp4
+          ffprobe -v error -show_entries format=duration,size,format_name             -of default=nw=1 work/source/source.mp4
 
       - name: Build whisper.cpp
         run: |
@@ -64,9 +64,11 @@ jobs:
 
       - name: Extract audio and transcribe
         run: |
-          SOURCE="$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"
-          ffmpeg -y -i "$SOURCE" -vn -ac 1 -ar 16000 -c:a pcm_s16le work/audio/source.wav
-          work/whisper.cpp/build/bin/whisper-cli             -m work/whisper.cpp/models/ggml-base.en.bin             -f work/audio/source.wav -l en -ng -ml 1 -osrt -ojf             -of work/audio/transcript
+          ffmpeg -y -i work/source/source.mp4 -vn -ac 1 -ar 16000 -c:a pcm_s16le work/audio/source.wav
+          work/whisper.cpp/build/bin/whisper-cli \
+            -m work/whisper.cpp/models/ggml-base.en.bin \
+            -f work/audio/source.wav -l en -ng -ml 1 -osrt -ojf \
+            -of work/audio/transcript
           test -s work/audio/transcript.srt
           test -s work/audio/transcript.json
 
@@ -74,7 +76,12 @@ jobs:
         env:
           CLIP_COUNT: ${{ inputs.clips || '5' }}
         run: |
-          python3 scripts/youtube_to_shorts.py             --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"             --srt work/audio/transcript.srt             --count "$CLIP_COUNT"             --plan data/clip_plan.json             --out out
+          python3 scripts/youtube_to_shorts.py \
+            --video work/source/source.mp4 \
+            --srt work/audio/transcript.srt \
+            --count "$CLIP_COUNT" \
+            --plan data/clip_plan.json \
+            --out out
 
       - name: Verify outputs
         run: |
@@ -83,7 +90,8 @@ jobs:
           test "$COUNT" -ge 1
           for f in out/short_*.mp4; do
             echo "=== $f ==="
-            ffprobe -v error -show_entries format=duration,size               -show_entries stream=width,height,codec_name -of default=nw=1 "$f"
+            ffprobe -v error -show_entries format=duration,size \
+              -show_entries stream=width,height,codec_name -of default=nw=1 "$f"
           done
 
       - name: Upload Shorts
