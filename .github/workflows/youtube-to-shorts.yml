@@ -1,5 +1,5 @@
 name: YouTube to Shorts
-# YouTube extraction hardened with EJS and PO-token support
+# YouTube extraction hardened with EJS/PO-token and proxy-frontend fallbacks
 
 on:
   push:
@@ -28,71 +28,119 @@ jobs:
       - name: Install media tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file
+          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file jq
 
-      - name: Diagnose and download source
+      - name: Download source
         env:
           SOURCE_URL: ${{ inputs.youtube_url || 'https://youtu.be/5p-sq8v3OXw?si=TYtkMQ6vzEFNY2Hj' }}
         shell: bash
         run: |
           set -Eeuo pipefail
           mkdir -p work/source work/audio out
-
           echo "SOURCE_URL=$SOURCE_URL"
-          echo "Runner:"
-          uname -a
-          curl --version | head -n 1
-          ffmpeg -version | head -n 1
-
-          echo "== HEAD/redirect diagnostic =="
-          curl -4 -sSIL --max-time 60 -A "Mozilla/5.0" "$SOURCE_URL" | sed -n '1,40p'
 
           if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
+            VIDEO_ID="$(python3 - <<'PY'
+import re, os
+u=os.environ["SOURCE_URL"]
+m=re.search(r'(?:v=|youtu\.be/|youtube\.com/(?:shorts|embed)/)([A-Za-z0-9_-]{11})', u)
+if not m:
+    raise SystemExit("Could not parse YouTube video ID")
+print(m.group(1))
+PY
+)"
+            echo "VIDEO_ID=$VIDEO_ID"
+
+            echo "== Attempt 1: yt-dlp + EJS + PO token =="
+            set +e
             python3 -m pip install --user -U "yt-dlp[default]" bgutil-ytdlp-pot-provider
             export PATH="$HOME/.local/bin:$PATH"
-            node --version
-            yt-dlp --version
             rm -rf work/bgutil-ytdlp-pot-provider
             git clone --depth 1 --branch 2.0.0 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git work/bgutil-ytdlp-pot-provider
-            cd work/bgutil-ytdlp-pot-provider/server
-            npm ci
-            npx tsc
-            cd "$GITHUB_WORKSPACE"
-            test -s work/bgutil-ytdlp-pot-provider/server/build/generate_once.js
-            yt-dlp -v --simulate --no-playlist \
-              --js-runtimes node \
-              --extractor-args "youtubepot-bgutilscript:script_path=$GITHUB_WORKSPACE/work/bgutil-ytdlp-pot-provider/server/build/generate_once.js" \
-              "$SOURCE_URL" 2>&1 | tee work/yt-dlp-probe.log
-            yt-dlp \
-              --no-playlist \
-              --retries 3 \
-              --fragment-retries 3 \
-              --extractor-retries 3 \
-              --socket-timeout 30 \
-              --force-ipv4 \
-              --js-runtimes node \
-              --extractor-args "youtubepot-bgutilscript:script_path=$GITHUB_WORKSPACE/work/bgutil-ytdlp-pot-provider/server/build/generate_once.js" \
-              --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
-              --merge-output-format mp4 \
-              --output "work/source/source.%(ext)s" \
-              "$SOURCE_URL"
+            (cd work/bgutil-ytdlp-pot-provider/server && npm ci && npx tsc)
+            yt-dlp --no-playlist --retries 2 --fragment-retries 2 --socket-timeout 30 --force-ipv4               --js-runtimes node               --extractor-args "youtubepot-bgutilscript:script_path=$GITHUB_WORKSPACE/work/bgutil-ytdlp-pot-provider/server/build/generate_once.js"               --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]"               --merge-output-format mp4 --output "work/source/source.%(ext)s" "$SOURCE_URL"
+            YTDLP_STATUS=$?
+            set -e
+
+            if [[ $YTDLP_STATUS -ne 0 ]]; then
+              echo "yt-dlp failed; switching to public proxy APIs."
+
+              cat > work/download_via_proxy.py <<'PY'
+import json, os, re, subprocess, sys, time, urllib.request, urllib.parse
+
+video_id = os.environ["VIDEO_ID"]
+out = "work/source/source.mp4"
+
+# Piped documents /streams/:videoId as an unauthenticated endpoint.
+piped = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.leptons.xyz",
+    "https://pipedapi.nosebs.ru",
+    "https://api.piped.yt",
+    "https://pipedapi.adminforge.de",
+]
+# Invidious exposes /api/v1/videos/:id on public instances.
+invidious = [
+    "https://inv.nadeko.net",
+    "https://invidious.nerdvpn.de",
+    "https://yewtu.be",
+]
+
+def get(url):
+    req = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=25) as r:
+        return json.load(r)
+
+def download(url, path):
+    cmd=["curl","-4","-L","--fail","--show-error","--retry","2","--connect-timeout","20","--max-time","900","-A","Mozilla/5.0",url,"-o",path]
+    return subprocess.run(cmd).returncode == 0
+
+for base in piped:
+    try:
+        data=get(base.rstrip("/")+"/streams/"+video_id)
+        vids=[x for x in data.get("videoStreams",[]) if x.get("url")]
+        auds=[x for x in data.get("audioStreams",[]) if x.get("url")]
+        if not vids or not auds:
+            continue
+        vids.sort(key=lambda x:(x.get("height") or 0, x.get("bitrate") or 0), reverse=True)
+        auds.sort(key=lambda x:x.get("bitrate") or 0, reverse=True)
+        v=next((x for x in vids if (x.get("height") or 9999)<=720 and x.get("format") in ("M4V","MP4")), vids[0])
+        a=auds[0]
+        print("Piped source:", base, "video", v.get("height"), v.get("format"))
+        if download(v["url"], "work/source/video.part") and download(a["url"], "work/source/audio.part"):
+            rc=subprocess.run(["ffmpeg","-y","-i","work/source/video.part","-i","work/source/audio.part","-c","copy",out]).returncode
+            if rc==0 and os.path.getsize(out)>100000:
+                sys.exit(0)
+    except Exception as e:
+        print("Piped failed:", base, repr(e))
+
+for base in invidious:
+    try:
+        data=get(base.rstrip("/")+"/api/v1/videos/"+video_id)
+        fmts=[x for x in data.get("adaptiveFormats",[]) if x.get("url")]
+        mux=[x for x in fmts if x.get("type","").startswith("video/mp4") and x.get("container")=="mp4"]
+        if mux:
+            mux.sort(key=lambda x:(x.get("resolution") or ""), reverse=True)
+            print("Invidious source:", base)
+            if download(mux[0]["url"], out) and os.path.getsize(out)>100000:
+                sys.exit(0)
+    except Exception as e:
+        print("Invidious failed:", base, repr(e))
+
+raise SystemExit("All alternate source endpoints failed")
+PY
+              VIDEO_ID="$VIDEO_ID" python3 work/download_via_proxy.py
+            fi
           elif [[ "$SOURCE_URL" == http://* || "$SOURCE_URL" == https://* ]]; then
-            echo "== Direct media download =="
-            curl -4 -L --fail --show-error --retry 5 --retry-delay 3 \
-              --connect-timeout 30 --max-time 900 \
-              -A "Mozilla/5.0" \
-              "$SOURCE_URL" -o work/source/source.mp4
+            curl -4 -L --fail --show-error --retry 5 --retry-delay 3               --connect-timeout 30 --max-time 900 -A "Mozilla/5.0"               "$SOURCE_URL" -o work/source/source.mp4
           else
             echo "Invalid source URL"
             exit 1
           fi
 
-          echo "== Downloaded files =="
-          find work/source -maxdepth 1 -type f -printf '%p %s bytes\n'
           SOURCE="$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"
           test -s "$SOURCE"
           file "$SOURCE"
-          echo "== ffprobe =="
           ffprobe -v error -show_entries format=duration,size,format_name -of default=nw=1 "$SOURCE"
 
       - name: Build whisper.cpp
@@ -106,12 +154,7 @@ jobs:
         run: |
           SOURCE="$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"
           ffmpeg -y -i "$SOURCE" -vn -ac 1 -ar 16000 -c:a pcm_s16le work/audio/source.wav
-          work/whisper.cpp/build/bin/whisper-cli \
-            -m work/whisper.cpp/models/ggml-base.en.bin \
-            -f work/audio/source.wav \
-            -l en -ng -ml 1 \
-            -osrt -ojf \
-            -of work/audio/transcript
+          work/whisper.cpp/build/bin/whisper-cli             -m work/whisper.cpp/models/ggml-base.en.bin             -f work/audio/source.wav -l en -ng -ml 1 -osrt -ojf             -of work/audio/transcript
           test -s work/audio/transcript.srt
           test -s work/audio/transcript.json
 
@@ -119,11 +162,7 @@ jobs:
         env:
           CLIP_COUNT: ${{ inputs.clips || '5' }}
         run: |
-          python3 scripts/youtube_to_shorts.py \
-            --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)" \
-            --srt work/audio/transcript.srt \
-            --count "$CLIP_COUNT" \
-            --out out
+          python3 scripts/youtube_to_shorts.py             --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"             --srt work/audio/transcript.srt --count "$CLIP_COUNT" --out out
 
       - name: Verify outputs
         run: |
@@ -132,7 +171,7 @@ jobs:
           test "$COUNT" -ge 1
           for f in out/short_*.mp4; do
             echo "=== $f ==="
-            ffprobe -v error -show_entries format=duration,size -show_entries stream=width,height,codec_name -of default=nw=1 "$f"
+            ffprobe -v error -show_entries format=duration,size               -show_entries stream=width,height,codec_name -of default=nw=1 "$f"
           done
 
       - name: Upload Shorts
