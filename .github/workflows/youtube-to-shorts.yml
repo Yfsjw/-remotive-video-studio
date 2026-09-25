@@ -1,5 +1,4 @@
 name: YouTube to Shorts
-# YouTube extraction hardened with EJS/PO-token and proxy-frontend fallbacks
 
 on:
   push:
@@ -28,7 +27,7 @@ jobs:
       - name: Install media tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file jq
+          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file
 
       - name: Download source
         env:
@@ -40,18 +39,7 @@ jobs:
           echo "SOURCE_URL=$SOURCE_URL"
 
           if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
-            VIDEO_ID="$(python3 - <<'PY'
-import re, os
-u=os.environ["SOURCE_URL"]
-m=re.search(r'(?:v=|youtu\.be/|youtube\.com/(?:shorts|embed)/)([A-Za-z0-9_-]{11})', u)
-if not m:
-    raise SystemExit("Could not parse YouTube video ID")
-print(m.group(1))
-PY
-)"
-            echo "VIDEO_ID=$VIDEO_ID"
-
-            echo "== Attempt 1: yt-dlp + EJS + PO token =="
+            echo "YouTube source: trying yt-dlp first."
             set +e
             python3 -m pip install --user -U "yt-dlp[default]" bgutil-ytdlp-pot-provider
             export PATH="$HOME/.local/bin:$PATH"
@@ -59,83 +47,17 @@ PY
             git clone --depth 1 --branch 2.0.0 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git work/bgutil-ytdlp-pot-provider
             (cd work/bgutil-ytdlp-pot-provider/server && npm ci && npx tsc)
             yt-dlp --no-playlist --retries 2 --fragment-retries 2 --socket-timeout 30 --force-ipv4               --js-runtimes node               --extractor-args "youtubepot-bgutilscript:script_path=$GITHUB_WORKSPACE/work/bgutil-ytdlp-pot-provider/server/build/generate_once.js"               --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]"               --merge-output-format mp4 --output "work/source/source.%(ext)s" "$SOURCE_URL"
-            YTDLP_STATUS=$?
+            STATUS=$?
             set -e
 
-            if [[ $YTDLP_STATUS -ne 0 ]]; then
-              echo "yt-dlp failed; switching to public proxy APIs."
-
-              cat > work/download_via_proxy.py <<'PY'
-import json, os, re, subprocess, sys, time, urllib.request, urllib.parse
-
-video_id = os.environ["VIDEO_ID"]
-out = "work/source/source.mp4"
-
-# Piped documents /streams/:videoId as an unauthenticated endpoint.
-piped = [
-    "https://pipedapi.kavin.rocks",
-    "https://pipedapi.leptons.xyz",
-    "https://pipedapi.nosebs.ru",
-    "https://api.piped.yt",
-    "https://pipedapi.adminforge.de",
-]
-# Invidious exposes /api/v1/videos/:id on public instances.
-invidious = [
-    "https://inv.nadeko.net",
-    "https://invidious.nerdvpn.de",
-    "https://yewtu.be",
-]
-
-def get(url):
-    req = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=25) as r:
-        return json.load(r)
-
-def download(url, path):
-    cmd=["curl","-4","-L","--fail","--show-error","--retry","2","--connect-timeout","20","--max-time","900","-A","Mozilla/5.0",url,"-o",path]
-    return subprocess.run(cmd).returncode == 0
-
-for base in piped:
-    try:
-        data=get(base.rstrip("/")+"/streams/"+video_id)
-        vids=[x for x in data.get("videoStreams",[]) if x.get("url")]
-        auds=[x for x in data.get("audioStreams",[]) if x.get("url")]
-        if not vids or not auds:
-            continue
-        vids.sort(key=lambda x:(x.get("height") or 0, x.get("bitrate") or 0), reverse=True)
-        auds.sort(key=lambda x:x.get("bitrate") or 0, reverse=True)
-        v=next((x for x in vids if (x.get("height") or 9999)<=720 and x.get("format") in ("M4V","MP4")), vids[0])
-        a=auds[0]
-        print("Piped source:", base, "video", v.get("height"), v.get("format"))
-        if download(v["url"], "work/source/video.part") and download(a["url"], "work/source/audio.part"):
-            rc=subprocess.run(["ffmpeg","-y","-i","work/source/video.part","-i","work/source/audio.part","-c","copy",out]).returncode
-            if rc==0 and os.path.getsize(out)>100000:
-                sys.exit(0)
-    except Exception as e:
-        print("Piped failed:", base, repr(e))
-
-for base in invidious:
-    try:
-        data=get(base.rstrip("/")+"/api/v1/videos/"+video_id)
-        fmts=[x for x in data.get("adaptiveFormats",[]) if x.get("url")]
-        mux=[x for x in fmts if x.get("type","").startswith("video/mp4") and x.get("container")=="mp4"]
-        if mux:
-            mux.sort(key=lambda x:(x.get("resolution") or ""), reverse=True)
-            print("Invidious source:", base)
-            if download(mux[0]["url"], out) and os.path.getsize(out)>100000:
-                sys.exit(0)
-    except Exception as e:
-        print("Invidious failed:", base, repr(e))
-
-raise SystemExit("All alternate source endpoints failed")
-PY
-              VIDEO_ID="$VIDEO_ID" python3 work/download_via_proxy.py
+            if [[ $STATUS -ne 0 ]]; then
+              echo "yt-dlp was blocked; using alternate public source APIs."
+              VIDEO_ID="$(python3 -c 'import re,sys; u=sys.argv[1]; m=re.search(r"(?:v=|youtu\\.be/|youtube\\.com/(?:shorts|embed)/)([A-Za-z0-9_-]{11})",u); print(m.group(1) if m else "")' "$SOURCE_URL")"
+              test -n "$VIDEO_ID"
+              VIDEO_ID="$VIDEO_ID" SOURCE_URL="$SOURCE_URL" python3 scripts/download_youtube_proxy.py
             fi
-          elif [[ "$SOURCE_URL" == http://* || "$SOURCE_URL" == https://* ]]; then
-            curl -4 -L --fail --show-error --retry 5 --retry-delay 3               --connect-timeout 30 --max-time 900 -A "Mozilla/5.0"               "$SOURCE_URL" -o work/source/source.mp4
           else
-            echo "Invalid source URL"
-            exit 1
+            curl -4 -L --fail --show-error --retry 5 --retry-delay 3               --connect-timeout 30 --max-time 900 -A "Mozilla/5.0"               "$SOURCE_URL" -o work/source/source.mp4
           fi
 
           SOURCE="$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"
@@ -162,7 +84,7 @@ PY
         env:
           CLIP_COUNT: ${{ inputs.clips || '5' }}
         run: |
-          python3 scripts/youtube_to_shorts.py             --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"             --srt work/audio/transcript.srt --count "$CLIP_COUNT" --out out
+          python3 scripts/youtube_to_shorts.py             --video "$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"             --srt work/audio/transcript.srt             --count "$CLIP_COUNT"             --out out
 
       - name: Verify outputs
         run: |
