@@ -50,7 +50,7 @@ jobs:
               set -e
               echo "Zolotube mirror HTTP/curl status: $MIRROR_STATUS"
               if [[ $MIRROR_STATUS -eq 0 ]]; then
-                MIRROR_MP4="$(printf '%s' "$MIRROR_HTML" | python3 -c 'import re,sys,html; s=html.unescape(sys.stdin.read()); xs=re.findall(r"(?:href|src)\\s*=\\s*["'"'"']([^"'"'"']+\\.mp4(?:\\?[^"'"'"']*)?)["'"'"']',s,re.I); print(next((x for x in xs if "720" in x.lower()), xs[0] if xs else ""))')"
+                MIRROR_MP4="$(printf '%s' "$MIRROR_HTML" | python3 -c "import re,sys,html; s=html.unescape(sys.stdin.read()); xs=re.findall(r'(?:href|src)\\s*=\\s*[\"\\x27]([^\"\\x27]+\\.mp4(?:\\?[^\"\\x27]*)?)[\"\\x27]',s,re.I); print(next((x for x in xs if '720' in x.lower()), xs[0] if xs else ''))")"
                 if [[ -n "$MIRROR_MP4" ]]; then
                   if [[ "$MIRROR_MP4" != http://* && "$MIRROR_MP4" != https://* ]]; then MIRROR_MP4="https://zolotube.com$MIRROR_MP4"; fi
                   echo "Zolotube returned a direct MP4; downloading it."
