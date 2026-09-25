@@ -3,6 +3,8 @@ name: Source Resolver Test
 on:
   push:
     branches: [agent-os-v1]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       video_url:
