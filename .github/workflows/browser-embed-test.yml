@@ -1,0 +1,66 @@
+name: Browser Embed Test
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  VIDEO_ID: 5p-sq8v3OXw
+
+jobs:
+  embed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium and Node
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium nodejs npm
+          npm init -y
+          npm install playwright
+      - name: Test embed playback
+        run: |
+          mkdir -p embed-test
+          cat > embed-test/test.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({
+            headless:true,
+            executablePath:'/usr/bin/chromium',
+            args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']
+          });
+          const context = await browser.newContext({
+            viewport:{width:1280,height:720},
+            userAgent:'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36'
+          });
+          const page = await context.newPage();
+          const media=[];
+          page.on('response', r=>{
+            const u=r.url(), ct=(r.headers()['content-type']||'').toLowerCase();
+            if ((u.includes('googlevideo.com') && !u.includes('generate_204')) || ct.includes('video/') || u.includes('.m3u8')) media.push({status:r.status(),ct,url:u.slice(0,2000)});
+          });
+          const url='https://www.youtube.com/embed/5p-sq8v3OXw?autoplay=1&playsinline=1&controls=1';
+          console.log('OPEN',url);
+          await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForTimeout(10000);
+          console.log('TITLE',await page.title());
+          console.log('PLAY_BUTTON',await page.locator('.ytp-large-play-button').count());
+          try { await page.locator('.ytp-large-play-button').click({force:true,timeout:5000}); } catch(e) { console.log('CLICK_ERR',String(e)); }
+          await page.waitForTimeout(15000);
+          const state=await page.evaluate(()=>{const v=document.querySelector('video'); return v?{src:(v.src||'').slice(0,2000),paused:v.paused,currentTime:v.currentTime,duration:v.duration,readyState:v.readyState}:null});
+          console.log('STATE',JSON.stringify(state));
+          console.log('MEDIA_COUNT',media.length);
+          for(const x of media.slice(0,10)) console.log('MEDIA',JSON.stringify(x));
+          await page.screenshot({path:'embed-test/player.png'});
+          await browser.close();
+          if(!media.length || !state || state.readyState===0) process.exit(2);
+          EOF
+          node embed-test/test.mjs 2>&1 | tee embed-test/result.txt
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-embed-test
+          path: embed-test/
+          retention-days: 3
