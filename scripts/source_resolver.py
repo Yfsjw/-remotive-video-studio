@@ -113,33 +113,43 @@ def cobalt(url, endpoint, out):
 
 def main():
     ap=argparse.ArgumentParser()
-    ap.add_argument("--url", required=True)
+    ap.add_argument("--url", required=True, help="URL identifying the video (normally YouTube)")
+    ap.add_argument("--source-url", default="", help="Optional independent direct media URL")
     ap.add_argument("--media-out", required=True)
     ap.add_argument("--transcript-out", required=True)
     ap.add_argument("--report", required=True)
     a=ap.parse_args()
+
     vid=video_id(a.url)
     if not vid:
-        raise SystemExit("Could not identify a YouTube video ID")
+        raise SystemExit("Could not identify a YouTube video ID from --url")
 
     report={"input_url":a.url,"video_id":vid,"media":None,"transcript":None,"attempts":[]}
 
-    # 1) If the input itself is a stable media URL, use it.
-    if re.match(r"^https?://", a.url) and (".mp4" in a.url.lower() or os.getenv("TRY_DIRECT_SOURCE")=="1"):
+    # 1) Independent direct media source, if supplied.
+    direct_source=a.source_url.strip()
+    if direct_source:
         with tempfile.NamedTemporaryFile(delete=False,suffix=".mp4") as t:
             tmp=t.name
-        r=curl_download(a.url,tmp)
+        r=curl_download(direct_source,tmp)
         p=probe(tmp) if r.returncode==0 else None
         if p:
             os.replace(tmp,a.media_out)
-            report["media"]={"method":"direct","probe":p}
+            report["media"]={"method":"direct-source-url","source_url":direct_source,"probe":p}
         else:
             Path(tmp).unlink(missing_ok=True)
+            report["attempts"].append({"method":"direct-source-url","url":direct_source,"verified":False})
 
-    # 2) Obtain transcript independently of media acquisition.
+    # 2) Transcript is independent from media acquisition.
     report["transcript"]=transcript(vid,a.transcript_out)
 
-    # 3) Try dynamically discovered Piped instances.\n    if not report["media"]:\n        result=piped_media(vid,a.media_out)\n        if result:\n            report["media"]=dict(result,method="piped")\n\n    # 4) Optional media gateways. Never claim success unless ffprobe validates the file.
+    # 3) Dynamically discover current Piped instances and validate real media.
+    if not report["media"]:
+        result=piped_media(vid,a.media_out)
+        if result:
+            report["media"]=dict(result,method="piped")
+
+    # 4) Optional Cobalt-compatible media gateways.
     endpoints=[x.strip() for x in os.getenv("MEDIA_RESOLVER_ENDPOINTS","").split(",") if x.strip()]
     if not report["media"] and endpoints:
         for ep in endpoints:
