@@ -39,9 +39,36 @@ jobs:
           echo "SOURCE_URL=$SOURCE_URL"
 
           if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
-            echo "YouTube source: trying a public mirror extractor first, then Cobalt/yt-dlp."
+            echo "YouTube source: trying Tunelio first, then mirror/Cobalt/yt-dlp fallbacks."
 
-            VIDEO_ID="$(python3 -c 'import re,sys; u=sys.argv[1]; m=re.search(r"(?:v=|youtu\\.be/)([A-Za-z0-9_-]{11})",u); print(m.group(1) if m else "")' "$SOURCE_URL")"
+            if [[ -n "${TUNELIO_API_KEY:-}" ]]; then
+              echo "Tunelio key is configured; requesting a 720p MP4."
+              set +e
+              TUNELIO_RESPONSE="$(curl -4 -sS --fail-with-body --retry 2 --connect-timeout 30 --max-time 120 \
+                -H "Authorization: Bearer ${TUNELIO_API_KEY}" \
+                --get "https://tunelio.dev/create" \
+                --data-urlencode "url=${SOURCE_URL}" \
+                --data-urlencode "quality=720p" 2>&1)"
+              TUNELIO_STATUS=$?
+              set -e
+              echo "Tunelio HTTP/curl status: $TUNELIO_STATUS"
+              echo "$TUNELIO_RESPONSE" | jq . 2>/dev/null || echo "$TUNELIO_RESPONSE"
+              if [[ $TUNELIO_STATUS -eq 0 ]]; then
+                TUNELIO_URL="$(echo "$TUNELIO_RESPONSE" | jq -r '.url // empty' 2>/dev/null)"
+                if [[ -n "$TUNELIO_URL" ]]; then
+                  echo "Tunelio returned a signed media URL; downloading source.mp4."
+                  curl -4 -L --fail --show-error --retry 5 --retry-delay 3 \
+                    --connect-timeout 30 --max-time 1200 "$TUNELIO_URL" -o work/source/source.mp4
+                fi
+              fi
+            else
+              echo "TUNELIO_API_KEY is not configured; skipping Tunelio."
+            fi
+
+            if [[ ! -s work/source/source.mp4 ]]; then
+              echo "Tunelio did not yield the source; trying Zolotube/Cobalt/yt-dlp fallbacks."
+
+              VIDEO_ID="$(python3 -c 'import re,sys; u=sys.argv[1]; m=re.search(r"(?:v=|youtu\\.be/)([A-Za-z0-9_-]{11})",u); print(m.group(1) if m else "")' "$SOURCE_URL")"
             if [[ -n "$VIDEO_ID" ]]; then
               MIRROR_PAGE="https://zolotube.com/watch?v=$VIDEO_ID"
               set +e
@@ -144,6 +171,7 @@ PY
                 echo "yt-dlp was blocked; using alternate public source APIs."
                 SOURCE_URL="$SOURCE_URL" python3 scripts/download_youtube_proxy.py
               fi
+            fi
             fi
             fi
           else
