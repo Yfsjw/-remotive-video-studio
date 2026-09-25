@@ -1,0 +1,68 @@
+name: Source Resolver Test
+
+on:
+  push:
+    branches: [agent-os-v1]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Video URL identifying the source video"
+        required: true
+        default: "https://youtu.be/5p-sq8v3OXw?si=TYtkMQ6vzEFNY2Hj"
+        type: string
+      source_url:
+        description: "Optional direct MP4 URL"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl python3
+      - name: Validate resolver syntax
+        run: python3 -m py_compile scripts/source_resolver.py
+      - name: Resolve source and transcript
+        env:
+          VIDEO_URL: ${{ inputs.video_url || 'https://youtu.be/5p-sq8v3OXw?si=TYtkMQ6vzEFNY2Hj' }}
+          SOURCE_URL: ${{ inputs.source_url || '' }}
+          MEDIA_RESOLVER_ENDPOINTS: ${{ vars.MEDIA_RESOLVER_ENDPOINTS }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p work/source work/audio
+          python3 scripts/source_resolver.py \
+            --url "$VIDEO_URL" \
+            --source-url "$SOURCE_URL" \
+            --media-out work/source/source.mp4 \
+            --transcript-out work/audio/remote_transcript.txt \
+            --report work/source/resolution.json > work/source/resolver.log 2>&1 || RESOLVE_STATUS=$?
+          cat work/source/resolver.log
+          cat work/source/resolution.json
+          echo "resolver_exit=${RESOLVE_STATUS:-0}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -s work/source/source.mp4 ]]; then
+            ffprobe -v error -show_entries format=duration,size,format_name -of default=nw=1 work/source/source.mp4
+          else
+            echo "No verified MP4 source was resolved."
+          fi
+          if [[ -s work/audio/remote_transcript.txt ]]; then
+            echo "Transcript bytes: $(wc -c < work/audio/remote_transcript.txt)"
+          fi
+      - name: Upload resolver diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-resolver-test
+          path: |
+            work/source/resolution.json
+            work/source/resolver.log
+            work/source/source.mp4
+            work/audio/remote_transcript.txt
+          if-no-files-found: warn
+          retention-days: 3

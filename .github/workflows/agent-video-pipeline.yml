@@ -1,0 +1,106 @@
+name: Agent Video Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "YouTube URL identifying the source video"
+        required: true
+        type: string
+      source_url:
+        description: "Optional direct MP4 URL if one is already known"
+        required: false
+        default: ""
+        type: string
+      clips:
+        description: "Number of Shorts"
+        required: false
+        default: "5"
+        type: string
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file jq fonts-dejavu-core
+
+      - name: Resolve source and transcript
+        env:
+          VIDEO_URL: ${{ inputs.video_url }}
+          DIRECT_SOURCE_URL: ${{ inputs.source_url }}
+          MEDIA_RESOLVER_ENDPOINTS: ${{ vars.MEDIA_RESOLVER_ENDPOINTS }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p work/source work/audio out work/assets
+          URL="$VIDEO_URL"
+          if [[ -n "$DIRECT_SOURCE_URL" ]]; then URL="$DIRECT_SOURCE_URL"; fi
+          python3 scripts/source_resolver.py             --url "$URL"             --media-out work/source/source.mp4             --transcript-out work/audio/remote_transcript.txt             --report work/source/resolution.json || true
+          cat work/source/resolution.json
+          test -s work/audio/remote_transcript.txt || echo "No remote transcript; Whisper will be used if media is available."
+          test -s work/source/source.mp4 || {
+            echo "::error::No verified media source was resolved."
+            echo "The pipeline deliberately stops here instead of pretending that a transcript is a video."
+            exit 3
+          }
+          ffprobe -v error -show_entries format=duration,size,format_name -of default=nw=1 work/source/source.mp4
+
+      - name: Build whisper.cpp
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git work/whisper.cpp
+          cmake -S work/whisper.cpp -B work/whisper.cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build work/whisper.cpp/build --config Release -j 2
+          bash work/whisper.cpp/models/download-ggml-model.sh base.en
+
+      - name: Transcribe
+        run: |
+          ffmpeg -y -i work/source/source.mp4 -vn -ac 1 -ar 16000 -c:a pcm_s16le work/audio/source.wav
+          work/whisper.cpp/build/bin/whisper-cli -m work/whisper.cpp/models/ggml-base.en.bin             -f work/audio/source.wav -l en -ng -ml 1 -osrt -ojf -of work/audio/transcript
+          test -s work/audio/transcript.srt
+          test -s work/audio/transcript.json
+
+      - name: Build storyboard
+        run: |
+          python3 scripts/build_storyboard.py --plan data/clip_plan.json --srt work/audio/transcript.srt --out work/storyboard.json
+          test -s work/storyboard.json
+
+      - name: Extract visual evidence
+        run: |
+          python3 scripts/extract_visual_assets.py --video work/source/source.mp4 --plan data/clip_plan.json --out work/assets
+          test -s work/assets/manifest.json
+          find work/assets -type f -name '*.jpg' -print
+
+      - name: Render source-first Shorts
+        env:
+          CLIP_COUNT: ${{ inputs.clips || '5' }}
+        run: |
+          python3 scripts/render_source_first.py --video work/source/source.mp4             --srt work/audio/transcript.srt --plan data/clip_plan.json --count "$CLIP_COUNT" --out out
+          COUNT=$(find out -maxdepth 1 -type f -name 'short_*.mp4' | wc -l)
+          test "$COUNT" -ge 1
+
+      - name: Technical quality control
+        run: |
+          set -Eeuo pipefail
+          for f in out/short_*.mp4; do
+            echo "=== $f ==="
+            ffprobe -v error -show_entries format=duration,size               -show_entries stream=width,height,codec_name,r_frame_rate               -of default=nw=1 "$f"
+            test -s "$f"
+          done
+
+      - name: Upload verified artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-video-pipeline
+          path: |
+            out/short_*.mp4
+            work/storyboard.json
+            work/assets/manifest.json
+            work/source/resolution.json
+            work/audio/remote_transcript.txt
+          if-no-files-found: error
+          retention-days: 3
