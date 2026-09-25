@@ -7,14 +7,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Test alternate source API
+      - name: Inspect Zolotube source
         run: |
           sudo apt-get update
           sudo apt-get install -y python3 curl ffmpeg
-          VIDEO_ID=5p-sq8v3OXw python3 scripts/download_youtube_proxy.py
-          ffprobe -v error -show_entries format=duration,size -of default=nw=1 work/source/source.mp4
+          mkdir -p work/source
+          curl -L --retry 3 --connect-timeout 15 -A "Mozilla/5.0" "https://zolotube.com/watch?v=5p-sq8v3OXw" -o work/source/zolotube.html
+          python3 - <<'PY'
+          import re, html
+          from pathlib import Path
+          s=Path("work/source/zolotube.html").read_text(errors="ignore")
+          s=html.unescape(s).replace("\\/", "/")
+          urls=re.findall(r'https?://[^"\'<> ]+?\.mp4(?:\?[^"\'<> ]*)?', s, re.I)
+          print("Zolotube MP4 candidates:", len(urls))
+          for u in urls[:20]:
+              print(u)
+          Path("work/source/zolotube_urls.txt").write_text("\n".join(urls))
+          PY
+          if [ -s work/source/zolotube_urls.txt ]; then
+            head -n 1 work/source/zolotube_urls.txt | xargs -I{} curl -L --retry 3 --connect-timeout 15 -A "Mozilla/5.0" "{}" -o work/source/source.mp4
+            file work/source/source.mp4
+            ffprobe -v error -show_entries format=duration,size -of default=nw=1 work/source/source.mp4
+          else
+            echo "No direct MP4 URL exposed in Zolotube HTML; testing existing fallback."
+            VIDEO_ID=5p-sq8v3OXw python3 scripts/download_youtube_proxy.py
+            ffprobe -v error -show_entries format=duration,size -of default=nw=1 work/source/source.mp4
+          fi
       - name: Upload source test
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: source-test
-          path: work/source/source.mp4
+          path: work/source/
