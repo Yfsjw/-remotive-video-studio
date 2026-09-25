@@ -52,9 +52,7 @@ jobs:
 
             if [[ $STATUS -ne 0 ]]; then
               echo "yt-dlp was blocked; using alternate public source APIs."
-              VIDEO_ID="$(python3 -c 'import re,sys; u=sys.argv[1]; m=re.search(r"(?:v=|youtu\\.be/|youtube\\.com/(?:shorts|embed)/)([A-Za-z0-9_-]{11})",u); print(m.group(1) if m else "")' "$SOURCE_URL")"
-              test -n "$VIDEO_ID"
-              VIDEO_ID="$VIDEO_ID" SOURCE_URL="$SOURCE_URL" python3 scripts/download_youtube_proxy.py
+              SOURCE_URL="$SOURCE_URL" python3 scripts/download_youtube_proxy.py
             fi
           else
             curl -4 -L --fail --show-error --retry 5 --retry-delay 3               --connect-timeout 30 --max-time 900 -A "Mozilla/5.0"               "$SOURCE_URL" -o work/source/source.mp4
