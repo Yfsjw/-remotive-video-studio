@@ -1,6 +1,9 @@
 name: WPC YouTube Source Test
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       youtube_url:
