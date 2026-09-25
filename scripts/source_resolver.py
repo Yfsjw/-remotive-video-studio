@@ -34,6 +34,44 @@ def probe(path):
     except Exception:
         return None
 
+def piped_instances():
+    try:
+        req=urllib.request.Request(
+            "https://raw.githubusercontent.com/TeamPiped/documentation/main/content/docs/public-instances/index.md",
+            headers={"User-Agent":UA})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            text=r.read().decode("utf-8","replace")
+        urls=re.findall(r"https://(?:pipedapi|api-piped|piped-api|watchapi|ytapi|piapi|pdapi|pa)\\.[A-Za-z0-9.-]+", text)
+        return list(dict.fromkeys(urls))
+    except Exception as e:
+        print(f"Piped instance discovery failed: {e}", file=sys.stderr)
+        return []
+
+def piped_media(video_id_value, out):
+    for base in piped_instances():
+        try:
+            endpoint=base.rstrip("/") + "/streams/" + video_id_value
+            req=urllib.request.Request(endpoint, headers={"User-Agent":UA})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                data=json.loads(r.read())
+            candidates=[]
+            for s in data.get("videoStreams") or []:
+                if s.get("url") and s.get("videoOnly") is False and str(s.get("format","")).upper()=="MP4":
+                    candidates.append(s)
+            candidates.sort(key=lambda s:int(s.get("width") or 0), reverse=True)
+            for s in candidates:
+                with tempfile.NamedTemporaryFile(delete=False,suffix=".mp4") as t:
+                    tmp=t.name
+                r=curl_download(s["url"],tmp)
+                p=probe(tmp) if r.returncode==0 else None
+                if p:
+                    os.replace(tmp,out)
+                    return {"instance":base,"stream":s,"probe":p}
+                Path(tmp).unlink(missing_ok=True)
+        except Exception as e:
+            print(f"Piped candidate failed {base}: {e}", file=sys.stderr)
+    return None
+
 def transcript(video_id_value, out):
     endpoints = [
         f"https://youtube-transcript.ai/transcript/{video_id_value}.txt?lang=en",
@@ -101,7 +139,7 @@ def main():
     # 2) Obtain transcript independently of media acquisition.
     report["transcript"]=transcript(vid,a.transcript_out)
 
-    # 3) Optional media gateways. Never claim success unless ffprobe validates the file.
+    # 3) Try dynamically discovered Piped instances.\n    if not report["media"]:\n        result=piped_media(vid,a.media_out)\n        if result:\n            report["media"]=dict(result,method="piped")\n\n    # 4) Optional media gateways. Never claim success unless ffprobe validates the file.
     endpoints=[x.strip() for x in os.getenv("MEDIA_RESOLVER_ENDPOINTS","").split(",") if x.strip()]
     if not report["media"] and endpoints:
         for ep in endpoints:
