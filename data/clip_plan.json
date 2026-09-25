@@ -1,0 +1,71 @@
+{
+  "video_id": "5p-sq8v3OXw",
+  "title": "AI Agents: The Most Valuable Skill You Can Learn in 2026 (Full Course)",
+  "strategy": "Curated editorial clips from the original course; prioritize self-contained ideas, strong hooks, concrete demonstrations, and visually useful screen moments.",
+  "clips": [
+    {
+      "id": "agent-vs-chat",
+      "start": 241,
+      "end": 300,
+      "title": "Chat asks. Agents act.",
+      "reason": "Core thesis and strongest definitional hook.",
+      "source_chapter": "04:04 What agent actually means"
+    },
+    {
+      "id": "observe-think-act",
+      "start": 668,
+      "end": 730,
+      "title": "The loop every AI agent runs",
+      "reason": "Simple mental model with repeatable structure.",
+      "source_chapter": "11:08 The observe-think-act loop"
+    },
+    {
+      "id": "live-demo",
+      "start": 1081,
+      "end": 1140,
+      "title": "Watch an agent work by itself",
+      "reason": "Concrete live demo is more compelling than abstract explanation.",
+      "source_chapter": "18:01 Live demo: analyzing an Instagram Reel"
+    },
+    {
+      "id": "onboarding",
+      "start": 1224,
+      "end": 1295,
+      "title": "Stop prompting. Onboard your AI.",
+      "reason": "Strong practical reframing: context, tools and skills.",
+      "source_chapter": "20:24 Tuning an agent vs building one"
+    },
+    {
+      "id": "memory",
+      "start": 2643,
+      "end": 2715,
+      "title": "Give your AI a memory that learns",
+      "reason": "Concrete self-improving workflow with a visible file edit.",
+      "source_chapter": "44:03 A memory system that improves itself"
+    },
+    {
+      "id": "mcp",
+      "start": 3126,
+      "end": 3195,
+      "title": "MCP is the bridge to your tools",
+      "reason": "Clear explanation of why agents become useful when connected to apps.",
+      "source_chapter": "52:06 MCP connectors, the universal translator"
+    },
+    {
+      "id": "skills",
+      "start": 4701,
+      "end": 4780,
+      "title": "A skill is an SOP for AI",
+      "reason": "Highly reusable concept with a practical analogy.",
+      "source_chapter": "01:18:21 Skills as SOPs for your AI"
+    },
+    {
+      "id": "ai-native",
+      "start": 12406,
+      "end": 12520,
+      "title": "Build AI-native teams from the bottom up",
+      "reason": "Strong strategic conclusion and memorable argument about training employees.",
+      "source_chapter": "02:06:46 The future of teams and intrapreneurship"
+    }
+  ]
+}
