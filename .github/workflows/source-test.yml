@@ -1,0 +1,20 @@
+name: Source Test
+on:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test alternate source API
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 curl ffmpeg
+          VIDEO_ID=5p-sq8v3OXw python3 scripts/download_youtube_proxy.py
+          ffprobe -v error -show_entries format=duration,size -of default=nw=1 work/source/source.mp4
+      - name: Upload source test
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-test
+          path: work/source/source.mp4
