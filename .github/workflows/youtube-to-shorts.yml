@@ -27,7 +27,7 @@ jobs:
       - name: Install media tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file
+          sudo apt-get install -y ffmpeg cmake build-essential python3 curl file jq
 
       - name: Download source
         env:
@@ -50,7 +50,30 @@ jobs:
               set -e
               echo "Zolotube mirror HTTP/curl status: $MIRROR_STATUS"
               if [[ $MIRROR_STATUS -eq 0 ]]; then
-                MIRROR_MP4="$(printf '%s' "$MIRROR_HTML" | python3 -c "import re,sys,html; s=html.unescape(sys.stdin.read()); xs=re.findall(r'(?:href|src)\\s*=\\s*[\"\\x27]([^\"\\x27]+\\.mp4(?:\\?[^\"\\x27]*)?)[\"\\x27]',s,re.I); print(next((x for x in xs if '720' in x.lower()), xs[0] if xs else ''))")"
+                printf '%s' "$MIRROR_HTML" > work/source/zolotube.html
+                MIRROR_MP4="$(python3 - <<'PY'
+import html,re
+from pathlib import Path
+s=html.unescape(Path("work/source/zolotube.html").read_text(errors="ignore"))
+patterns=[
+    r'https?://[^"\\\'<>\\s]+?\\.mp4(?:\\?[^"\\\'<>\\s]*)?',
+    r'(?:href|src|data-href|data-url|data-download|download-url)\\s*=\\s*["\\\']([^"\\\']+\\.mp4(?:\\?[^"\\\']*)?)["\\\']',
+    r'["\\\'](\\/[^"\\\']+\\.mp4(?:\\?[^"\\\']*)?)["\\\']',
+]
+found=[]
+for p in patterns:
+    found += re.findall(p,s,re.I)
+clean=[]
+for x in found:
+    x=html.unescape(x).replace("\\/","/")
+    if x not in clean: clean.append(x)
+for x in clean:
+    if re.search(r'(720p|720)',x,re.I):
+        print(x); break
+else:
+    print(clean[0] if clean else "")
+PY
+)"
                 if [[ -n "$MIRROR_MP4" ]]; then
                   if [[ "$MIRROR_MP4" != http://* && "$MIRROR_MP4" != https://* ]]; then MIRROR_MP4="https://zolotube.com$MIRROR_MP4"; fi
                   echo "Zolotube returned a direct MP4; downloading it."
