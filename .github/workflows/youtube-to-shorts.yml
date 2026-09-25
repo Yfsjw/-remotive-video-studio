@@ -40,7 +40,7 @@ jobs:
 
           if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
             echo "YouTube source: trying self-hosted Cobalt first."
-            COBALT_URL="https://yasser-cobalt-source-v4.onrender.com"
+            COBALT_URL="https://cobaltapi.cjs.nz"
             set +e
             COBALT_RESPONSE="$(curl -4 -sS --fail-with-body --retry 2 --connect-timeout 30 --max-time 120 \
               -H "Accept: application/json" \
