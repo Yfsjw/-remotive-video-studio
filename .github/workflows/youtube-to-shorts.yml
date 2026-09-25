@@ -38,126 +38,62 @@ jobs:
           mkdir -p work/source work/audio out
           echo "SOURCE_URL=$SOURCE_URL"
 
-          if [[ "$SOURCE_URL" == *youtube.com/* || "$SOURCE_URL" == *youtu.be/* ]]; then
-            echo "YouTube source: using our self-hosted Cobalt gateway, then mirror/yt-dlp fallbacks."
+          if [[ "$SOURCE_URL" == *.mp4 || "$SOURCE_URL" == *".mp4?"* ]]; then
+            echo "Direct MP4 source."
+            curl -4 -L --fail --show-error --retry 5 --retry-delay 3 \
+              --connect-timeout 30 --max-time 1800 -A "Mozilla/5.0" \
+              "$SOURCE_URL" -o work/source/source.mp4
+          else
+            echo "YouTube source: self-hosted Cobalt first."
 
-            if [[ ! -s work/source/source.mp4 ]]; then
-              echo "Tunelio did not yield the source; trying Zolotube/Cobalt/yt-dlp fallbacks."
-
-              VIDEO_ID="$(python3 -c 'import re,sys; u=sys.argv[1]; m=re.search(r"(?:v=|youtu\\.be/)([A-Za-z0-9_-]{11})",u); print(m.group(1) if m else "")' "$SOURCE_URL")"
-            if [[ -n "$VIDEO_ID" ]]; then
-              MIRROR_PAGE="https://zolotube.com/watch?v=$VIDEO_ID"
-              set +e
-              MIRROR_HTML="$(curl -4 -sS -L --retry 2 --connect-timeout 20 --max-time 60 -A "Mozilla/5.0" "$MIRROR_PAGE" 2>&1)"
-              MIRROR_STATUS=$?
-              set -e
-              echo "Zolotube mirror HTTP/curl status: $MIRROR_STATUS"
-              if [[ $MIRROR_STATUS -eq 0 ]]; then
-                printf '%s' "$MIRROR_HTML" > work/source/zolotube.html
-                MIRROR_MP4="$(python3 - <<'PY'
-import html,re
-from pathlib import Path
-s=html.unescape(Path("work/source/zolotube.html").read_text(errors="ignore"))
-patterns=[
-    r'https?://[^"\\\'<>\\s]+?\\.mp4(?:\\?[^"\\\'<>\\s]*)?',
-    r'(?:href|src|data-href|data-url|data-download|download-url)\\s*=\\s*["\\\']([^"\\\']+\\.mp4(?:\\?[^"\\\']*)?)["\\\']',
-    r'["\\\'](\\/[^"\\\']+\\.mp4(?:\\?[^"\\\']*)?)["\\\']',
-]
-found=[]
-for p in patterns:
-    found += re.findall(p,s,re.I)
-clean=[]
-for x in found:
-    x=html.unescape(x).replace("\\/","/")
-    if x not in clean: clean.append(x)
-for x in clean:
-    if re.search(r'(720p|720)',x,re.I):
-        print(x); break
-else:
-    print(clean[0] if clean else "")
-PY
-)"
-                if [[ -n "$MIRROR_MP4" ]]; then
-                  if [[ "$MIRROR_MP4" != http://* && "$MIRROR_MP4" != https://* ]]; then MIRROR_MP4="https://zolotube.com$MIRROR_MP4"; fi
-                  echo "Zolotube returned a direct MP4; downloading it."
-                  curl -4 -L --fail --show-error --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 900 -A "Mozilla/5.0" "$MIRROR_MP4" -o work/source/source.mp4
-                else
-                  echo "Zolotube page had no directly extractable MP4 link."
-                fi
-              fi
-            fi
-
-            if [[ ! -s work/source/source.mp4 ]]; then
-              echo "Zolotube did not yield the source; trying self-hosted Cobalt."
-            COBALT_URL="https://yasser-cobalt-source-v4.onrender.com"
-            set +e
-            COBALT_RESPONSE="$(curl -4 -sS --fail-with-body --retry 2 --connect-timeout 30 --max-time 120 \
+            COBALT_RESPONSE="$(curl -4 -sS --fail-with-body --retry 2 \
+              --connect-timeout 30 --max-time 180 \
               -H "Accept: application/json" \
               -H "Content-Type: application/json" \
-              -X POST "$COBALT_URL/" \
-              --data "$(jq -nc --arg url "$SOURCE_URL" '{url:$url,downloadMode:"auto",videoQuality:"720",youtubeVideoCodec:"h264",youtubeVideoContainer:"mp4"}')" 2>&1)"
-            COBALT_STATUS=$?
-            set -e
-            echo "Cobalt HTTP/curl status: $COBALT_STATUS"
-            echo "$COBALT_RESPONSE" | jq . 2>/dev/null || echo "$COBALT_RESPONSE"
+              -X POST "https://yasser-cobalt-source-v4.onrender.com/" \
+              --data "$(jq -nc --arg url "$SOURCE_URL" \
+                '{url:$url,downloadMode:"auto",videoQuality:"720",youtubeVideoCodec:"h264",youtubeVideoContainer:"mp4"}')" || true)"
 
-            if [[ $COBALT_STATUS -eq 0 ]]; then
-              DOWNLOAD_URL="$(echo "$COBALT_RESPONSE" | jq -r 'if (.status=="tunnel" or .status=="redirect") then .url // empty else empty end' 2>/dev/null)"
-              if [[ -n "$DOWNLOAD_URL" ]]; then
-                echo "Cobalt returned a downloadable URL; downloading source."
-                curl -4 -L --fail --show-error --retry 5 --retry-delay 3 \
-                  --connect-timeout 30 --max-time 900 -A "Mozilla/5.0" \
-                  "$DOWNLOAD_URL" -o work/source/source.mp4
-              else
-                echo "Cobalt did not return a downloadable URL; falling back to yt-dlp."
-                set +e
-                python3 -m pip install --user -U "yt-dlp[default]" bgutil-ytdlp-pot-provider
-                export PATH="$HOME/.local/bin:$PATH"
-                rm -rf work/bgutil-ytdlp-pot-provider
-                git clone --depth 1 --branch 2.0.0 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git work/bgutil-ytdlp-pot-provider
-                (cd work/bgutil-ytdlp-pot-provider/server && npm ci && npx tsc)
-                yt-dlp --no-playlist --retries 2 --fragment-retries 2 --socket-timeout 30 --force-ipv4 \
-                  --js-runtimes node \
-                  --extractor-args "youtubepot-bgutilscript:script_path=$GITHUB_WORKSPACE/work/bgutil-ytdlp-pot-provider/server/build/generate_once.js" \
-                  --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
-                  --merge-output-format mp4 --output "work/source/source.%(ext)s" "$SOURCE_URL"
-                STATUS=$?
-                set -e
-                if [[ $STATUS -ne 0 ]]; then
-                  echo "yt-dlp was blocked; using alternate public source APIs."
-                  SOURCE_URL="$SOURCE_URL" python3 scripts/download_youtube_proxy.py
-                fi
-              fi
+            echo "$COBALT_RESPONSE" | jq . 2>/dev/null || echo "$COBALT_RESPONSE"
+            DOWNLOAD_URL="$(echo "$COBALT_RESPONSE" | jq -r \
+              'if (.status=="tunnel" or .status=="redirect") then .url // empty else empty end' \
+              2>/dev/null || true)"
+
+            if [[ -n "$DOWNLOAD_URL" ]]; then
+              echo "Self-hosted Cobalt returned a media URL."
+              curl -4 -L --fail --show-error --retry 5 --retry-delay 3 \
+                --connect-timeout 30 --max-time 1800 -A "Mozilla/5.0" \
+                "$DOWNLOAD_URL" -o work/source/source.mp4
             else
-              echo "Cobalt request failed; falling back to yt-dlp."
+              echo "Self-hosted Cobalt did not return a media URL. Trying yt-dlp once."
               set +e
               python3 -m pip install --user -U "yt-dlp[default]" bgutil-ytdlp-pot-provider
               export PATH="$HOME/.local/bin:$PATH"
               rm -rf work/bgutil-ytdlp-pot-provider
-              git clone --depth 1 --branch 2.0.0 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git work/bgutil-ytdlp-pot-provider
+              git clone --depth 1 --branch 2.0.0 \
+                https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git \
+                work/bgutil-ytdlp-pot-provider
               (cd work/bgutil-ytdlp-pot-provider/server && npm ci && npx tsc)
-              yt-dlp --no-playlist --retries 2 --fragment-retries 2 --socket-timeout 30 --force-ipv4 \
-                --js-runtimes node \
+              yt-dlp --no-playlist --retries 2 --fragment-retries 2 \
+                --socket-timeout 30 --force-ipv4 --js-runtimes node \
                 --extractor-args "youtubepot-bgutilscript:script_path=$GITHUB_WORKSPACE/work/bgutil-ytdlp-pot-provider/server/build/generate_once.js" \
                 --format "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]" \
-                --merge-output-format mp4 --output "work/source/source.%(ext)s" "$SOURCE_URL"
+                --merge-output-format mp4 \
+                --output "work/source/source.%(ext)s" "$SOURCE_URL"
               STATUS=$?
               set -e
               if [[ $STATUS -ne 0 ]]; then
-                echo "yt-dlp was blocked; using alternate public source APIs."
-                SOURCE_URL="$SOURCE_URL" python3 scripts/download_youtube_proxy.py
+                echo "No source was acquired. Stopping instead of trying unreliable public mirrors."
+                exit $STATUS
               fi
             fi
-            fi
-            fi
-          else
-            curl -4 -L --fail --show-error --retry 5 --retry-delay 3               --connect-timeout 30 --max-time 900 -A "Mozilla/5.0"               "$SOURCE_URL" -o work/source/source.mp4
           fi
 
           SOURCE="$(find work/source -maxdepth 1 -type f -name 'source.*' | head -n 1)"
           test -s "$SOURCE"
           file "$SOURCE"
-          ffprobe -v error -show_entries format=duration,size,format_name -of default=nw=1 "$SOURCE"
+          ffprobe -v error -show_entries format=duration,size,format_name \
+            -of default=nw=1 "$SOURCE"
 
       - name: Build whisper.cpp
         run: |
