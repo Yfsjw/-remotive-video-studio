@@ -28,6 +28,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl python3
+      - name: Validate resolver syntax
+        run: python3 -m py_compile scripts/source_resolver.py
       - name: Resolve source and transcript
         env:
           VIDEO_URL: ${{ inputs.video_url || 'https://youtu.be/5p-sq8v3OXw?si=TYtkMQ6vzEFNY2Hj' }}
