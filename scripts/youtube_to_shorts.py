@@ -88,6 +88,7 @@ def main():
     ap.add_argument("--video", required=True)
     ap.add_argument("--srt", required=True)
     ap.add_argument("--count", type=int, default=4)
+    ap.add_argument("--plan", default="")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
@@ -95,6 +96,18 @@ def main():
     cues = parse_srt(args.srt)
     if not cues:
         raise SystemExit("No transcript cues found")
+
+    selected = []
+    if args.plan:
+        import json
+        plan = json.load(open(args.plan, encoding="utf-8"))
+        for item in plan.get("clips", [])[:args.count]:
+            start = float(item["start"])
+            end = float(item["end"])
+            if end > start:
+                selected.append((1000.0 - start / 100000.0, start, end, item.get("title", "")))
+        if not selected:
+            raise SystemExit("Clip plan contained no usable clips")
 
     # Build candidate windows around sentence/cue boundaries.
     candidates = []
@@ -113,14 +126,14 @@ def main():
                 break
 
     candidates.sort(reverse=True)
-    selected = []
-    for cand in candidates:
-        _, start, end, _ = cand
-        # Avoid near-duplicate Shorts.
-        if all(end <= s + 12 or start >= e - 12 for _, s, e, _ in selected):
-            selected.append(cand)
-        if len(selected) >= args.count:
-            break
+    if not selected:
+        for cand in candidates:
+            _, start, end, _ = cand
+            # Avoid near-duplicate Shorts.
+            if all(end <= s + 12 or start >= e - 12 for _, s, e, _ in selected):
+                selected.append(cand)
+            if len(selected) >= args.count:
+                break
 
     if not selected:
         # Fallback: contiguous transcript windows.
